@@ -1,0 +1,194 @@
+"""
+core.py - Clases base del sistema Saussure-Quantum
+
+Contiene:
+- SignoCuanto: Representación del signo lingüístico como estado cuántico
+- Langue: El sistema de la lengua como espacio de Hilbert
+"""
+
+import numpy as np
+from typing import List, Union, Optional, Dict, Any
+import warnings
+
+
+class SignoCuanto:
+    """
+    Signo lingüístico como estado cuántico.
+    
+    Un signo-cuanto es una superposición de significantes posibles,
+    cada uno con una amplitud de probabilidad compleja.
+    
+    Attributes:
+        significantes (List[str]): Lista de significantes posibles
+        amplitudes (np.ndarray): Vector de amplitudes complejas
+        dimension (int): Dimensión del espacio de Hilbert
+    """
+    
+    def __init__(self, 
+                 significantes: List[str], 
+                 amplitudes: Optional[List[complex]] = None):
+        """
+        Inicializar un signo-cuanto.
+        
+        Args:
+            significantes: Lista de etiquetas para los significantes
+            amplitudes: Lista de amplitudes complejas (opcional)
+                        Si es None, se crea superposición equitativa
+        """
+        self.significantes = significantes
+        self.dimension = len(significantes)
+        
+        if amplitudes is None:
+            # Superposición equitativa: todos con misma amplitud
+            amp = 1.0 / np.sqrt(self.dimension)
+            self.amplitudes = np.ones(self.dimension, dtype=complex) * amp
+        else:
+            self.amplitudes = np.array(amplitudes, dtype=complex)
+            
+        self.normalizar()
+    
+    def normalizar(self) -> None:
+        """Normalizar el vector de amplitudes (norma L2 = 1)"""
+        norma = np.linalg.norm(self.amplitudes)
+        if norma > 0:
+            self.amplitudes = self.amplitudes / norma
+        else:
+            warnings.warn("Vector de amplitudes nulo. Inicializando uniformemente.")
+            self.amplitudes = np.ones(self.dimension, dtype=complex) / np.sqrt(self.dimension)
+    
+    def probabilidad(self, significante: Union[str, int]) -> float:
+        """
+        Calcular probabilidad de colapsar a un significante específico.
+        
+        Args:
+            significante: El significante (str) o su índice (int)
+        
+        Returns:
+            Probabilidad (entre 0 y 1)
+        """
+        if isinstance(significante, str):
+            try:
+                idx = self.significantes.index(significante)
+            except ValueError:
+                raise ValueError(f"Significante '{significante}' no encontrado")
+        else:
+            idx = significante
+            
+        return float(np.abs(self.amplitudes[idx]) ** 2)
+    
+    def colapsar(self, idx: Optional[int] = None) -> str:
+        """
+        Acto de parole: colapsar la superposición a un significante.
+        
+        Args:
+            idx: Índice específico (para pruebas) o None para muestreo probabilístico
+        
+        Returns:
+            El significante resultante del colapso
+        """
+        if idx is None:
+            # Muestreo según |amplitud|^2
+            probabilidades = np.abs(self.amplitudes) ** 2
+            idx = np.random.choice(self.dimension, p=probabilidades)
+        
+        # Colapso: el estado se convierte en un vector base
+        nueva_amplitud = np.zeros(self.dimension, dtype=complex)
+        nueva_amplitud[idx] = 1.0
+        self.amplitudes = nueva_amplitud
+        
+        return self.significantes[idx]
+    
+    def densidad(self) -> np.ndarray:
+        """
+        Matriz densidad del estado puro.
+        
+        Returns:
+            Matriz densidad ρ = |ψ⟩⟨ψ|
+        """
+        return np.outer(self.amplitudes, self.amplitudes.conj())
+    
+    def fase_relativa(self, i: int, j: int) -> float:
+        """
+        Calcular fase relativa entre dos significantes.
+        
+        Returns:
+            Ángulo de fase en radianes
+        """
+        return np.angle(self.amplitudes[i] / self.amplitudes[j])
+    
+    def __repr__(self) -> str:
+        return f"SignoCuanto({self.significantes[:3]}...)" if len(self.significantes) > 3 else f"SignoCuanto({self.significantes})"
+    
+    def __str__(self) -> str:
+        """Representación legible del estado"""
+        lines = [f"Signo-cuanto (d={self.dimension}):"]
+        for i, sig in enumerate(self.significantes):
+            prob = self.probabilidad(i) * 100
+            amp = self.amplitudes[i]
+            lines.append(f"  {sig}: |{amp:.3f}|² = {prob:.1f}%")
+        return "\n".join(lines)
+
+
+class Langue:
+    """
+    Sistema de la lengua como espacio de Hilbert.
+    
+    La langue es el conjunto de todas las diferencias potenciales,
+    similar al espacio de estados de un sistema cuántico.
+    """
+    
+    def __init__(self, dimension: int, nombre: str = "Langue"):
+        """
+        Inicializar el sistema lengua.
+        
+        Args:
+            dimension: Dimensión del espacio de Hilbert
+            nombre: Nombre identificador del sistema
+        """
+        self.dimension = dimension
+        self.nombre = nombre
+        self._base = [f"término_{i}" for i in range(dimension)]
+    
+    def estado_base(self, idx: int) -> SignoCuanto:
+        """
+        Crear un estado base (significante puro).
+        
+        Args:
+            idx: Índice del término base
+        
+        Returns:
+            SignoCuanto colapsado a ese término
+        """
+        amplitudes = np.zeros(self.dimension, dtype=complex)
+        amplitudes[idx] = 1.0
+        return SignoCuanto(self._base, amplitudes)
+    
+    def superposicion(self, coeficientes: List[complex]) -> SignoCuanto:
+        """
+        Crear un estado en superposición.
+        
+        Args:
+            coeficientes: Coeficientes para cada término base
+        
+        Returns:
+            SignoCuanto en superposición
+        """
+        if len(coeficientes) != self.dimension:
+            raise ValueError(f"Se requieren {self.dimension} coeficientes")
+        return SignoCuanto(self._base, coeficientes)
+    
+    def base_canonica(self) -> List[SignoCuanto]:
+        """Obtener la base canónica del espacio"""
+        return [self.estado_base(i) for i in range(self.dimension)]
+    
+    def producto_interno(self, psi: SignoCuanto, phi: SignoCuanto) -> complex:
+        """
+        Producto interno entre dos signos-cuanto.
+        Representa la similitud semántica cuántica.
+        """
+        if psi.dimension != phi.dimension:
+            raise ValueError("Dimensiones incompatibles")
+        return np.vdot(psi.amplitudes, phi.amplitudes)
+    
+    def __repr__(self) -> str:
+        return f"Langue('{self.nombre}', d={self.dimension})"

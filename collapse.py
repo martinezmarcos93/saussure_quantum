@@ -1,0 +1,312 @@
+"""
+collapse.py - Parole como medición cuántica
+
+Implementa:
+- El acto de habla como colapso de la superposición lingüística
+- Diferentes tipos de medición (fuerte, débil, parcial)
+- Producción de realidad semiótica
+- Observadores y contextos de enunciación
+"""
+
+import numpy as np
+from typing import List, Dict, Optional, Tuple, Callable, Any
+from dataclasses import dataclass
+from saussure_quantum.core import SignoCuanto, Langue
+
+
+@dataclass
+class ContextoEnunciativo:
+    """
+    Contexto del acto de parole (medición).
+    
+    Análogo al aparato de medición en mecánica cuántica.
+    """
+    temperatura_semantica: float = 1.0  # Ruido/indeterminación (0=frío, 1=caliente)
+    intencionalidad: Optional[List[float]] = None  # Sesgo hacia ciertos significantes
+    ruido_ambiental: float = 0.0  # Probabilidad de error en la medición
+    
+    def __post_init__(self):
+        if self.intencionalidad is not None:
+            # Normalizar intencionalidad
+            self.intencionalidad = np.array(self.intencionalidad, dtype=float)
+            self.intencionalidad = self.intencionalidad / np.sum(self.intencionalidad)
+
+
+def colapso_parole(
+    estado: SignoCuanto, 
+    contexto: Optional[ContextoEnunciativo] = None,
+    indice_forzado: Optional[int] = None
+) -> Tuple[str, SignoCuanto, Dict[str, Any]]:
+    """
+    ACTO DE PAROLE: Colapsa la superposición lingüística a un significante.
+    
+    Esta función modela el momento en que un hablante actualiza el sistema
+    lengua, produciendo una realidad semiótica concreta.
+    
+    Args:
+        estado: Signo-cuanto en superposición (lengua potencial)
+        contexto: Contexto enunciativo (aparato de medición)
+        indice_forzado: Para pruebas, fuerza un resultado específico
+    
+    Returns:
+        (significante_resultante, estado_colapsado, info_medicion)
+    
+    Example:
+        >>> signo = SignoCuanto(["sol", "luna", "estrella"], [1, 0.5j, 0.7])
+        >>> resultado, nuevo_estado, info = colapso_parole(signo)
+        >>> print(f"Dijo: {resultado}")
+    """
+    if contexto is None:
+        contexto = ContextoEnunciativo()
+    
+    # 1. Obtener probabilidades base del estado
+    probabilidades_base = np.abs(estado.amplitudes) ** 2
+    
+    # 2. Aplicar contexto (distorsión de la medición)
+    if contexto.intencionalidad is not None:
+        # Sesgo intencional del hablante
+        probabilidades = probabilidades_base * contexto.intencionalidad
+        # Re-normalizar
+        if np.sum(probabilidades) > 0:
+            probabilidades = probabilidades / np.sum(probabilidades)
+        else:
+            probabilidades = probabilidades_base
+    else:
+        probabilidades = probabilidades_base
+    
+    # 3. Aplicar temperatura semántica (ruido)
+    if contexto.temperatura_semantica != 1.0:
+        # Distribución de Boltzmann modificada
+        beta = 1.0 / max(contexto.temperatura_semantica, 0.01)
+        probabilidades = probabilidades ** beta
+        probabilidades = probabilidades / np.sum(probabilidades)
+    
+    # 4. Aplicar ruido ambiental
+    if contexto.ruido_ambiental > 0:
+        ruido = np.random.uniform(0, contexto.ruido_ambiental, len(probabilidades))
+        probabilidades = probabilidades + ruido
+        probabilidades = probabilidades / np.sum(probabilidades)
+    
+    # 5. Seleccionar resultado
+    if indice_forzado is not None:
+        idx = indice_forzado
+    else:
+        idx = np.random.choice(estado.dimension, p=probabilidades)
+    
+    # 6. Colapsar el estado
+    nuevo_estado = SignoCuanto(estado.significantes.copy(), None)
+    nuevo_estado.amplitudes = np.zeros(estado.dimension, dtype=complex)
+    nuevo_estado.amplitudes[idx] = 1.0
+    
+    # 7. Registrar información de la medición
+    info = {
+        "probabilidades_originales": probabilidades_base.tolist(),
+        "probabilidades_modificadas": probabilidades.tolist(),
+        "indice_seleccionado": idx,
+        "contexto_utilizado": contexto,
+        "incertidumbre_medicion": -np.sum(probabilidades * np.log(probabilidades + 1e-10))
+    }
+    
+    return estado.significantes[idx], nuevo_estado, info
+
+
+class MedidorParole:
+    """
+    Medidor cuántico para el acto de habla.
+    
+    Permite realizar múltiples mediciones y mantener estadísticas
+    del comportamiento del sistema lengua.
+    """
+    
+    def __init__(self, contexto_base: Optional[ContextoEnunciativo] = None):
+        """
+        Inicializar medidor de parole.
+        
+        Args:
+            contexto_base: Contexto por defecto para las mediciones
+        """
+        self.contexto_base = contexto_base or ContextoEnunciativo()
+        self.historial = []
+        self.estadisticas = {}
+    
+    def medir(
+        self, 
+        estado: SignoCuanto, 
+        contexto: Optional[ContextoEnunciativo] = None,
+        registrar: bool = True
+    ) -> Tuple[str, SignoCuanto]:
+        """
+        Realizar una medición (acto de parole).
+        
+        Args:
+            estado: Estado a medir
+            contexto: Contexto específico (opcional)
+            registrar: Si se guarda en historial
+        
+        Returns:
+            (significante, estado_colapsado)
+        """
+        ctx = contexto or self.contexto_base
+        resultado, nuevo_estado, info = colapso_parole(estado, ctx)
+        
+        if registrar:
+            self.historial.append({
+                "estado_inicial": estado.amplitudes.copy(),
+                "contexto": ctx,
+                "resultado": resultado,
+                "info": info
+            })
+            self._actualizar_estadisticas(resultado)
+        
+        return resultado, nuevo_estado
+    
+    def _actualizar_estadisticas(self, resultado: str):
+        """Actualizar contadores estadísticos"""
+        if resultado not in self.estadisticas:
+            self.estadisticas[resultado] = 0
+        self.estadisticas[resultado] += 1
+    
+    def medir_multiples(
+        self, 
+        estado: SignoCuanto, 
+        n_mediciones: int,
+        contexto: Optional[ContextoEnunciativo] = None
+    ) -> Dict[str, float]:
+        """
+        Realizar múltiples mediciones del mismo estado.
+        
+        Útil para estudiar la distribución de colapsos.
+        
+        Args:
+            estado: Estado a medir
+            n_mediciones: Número de actos de parole
+            contexto: Contexto (opcional)
+        
+        Returns:
+            Frecuencias relativas de cada significante
+        """
+        resultados = []
+        estado_original = SignoCuanto(estado.significantes.copy(), estado.amplitudes.copy())
+        
+        for _ in range(n_mediciones):
+            # Restaurar estado original antes de cada medición
+            estado_actual = SignoCuanto(estado_original.significantes.copy(), estado_original.amplitudes.copy())
+            resultado, _ = self.medir(estado_actual, contexto, registrar=False)
+            resultados.append(resultado)
+        
+        # Calcular frecuencias
+        frecuencias = {}
+        for r in resultados:
+            frecuencias[r] = frecuencias.get(r, 0) + 1
+        
+        for k in frecuencias:
+            frecuencias[k] /= n_mediciones
+        
+        return frecuencias
+    
+    def reset(self):
+        """Reiniciar historial y estadísticas"""
+        self.historial = []
+        self.estadisticas = {}
+    
+    def entropia_parole(self) -> float:
+        """
+        Calcular entropía del sistema parole.
+        
+        Mayor entropía = mayor indeterminación en los actos de habla.
+        """
+        if not self.estadisticas:
+            return 0.0
+        
+        total = sum(self.estadisticas.values())
+        probs = [c/total for c in self.estadisticas.values()]
+        return -np.sum(p * np.log(p) for p in probs if p > 0)
+
+
+def medicion_debil(
+    estado: SignoCuanto,
+    fuerza: float = 0.3,
+    n_pasos: int = 5
+) -> Tuple[str, SignoCuanto, List[Dict]]:
+    """
+    Mediciones débiles sucesivas (colapso gradual).
+    
+    Simula cómo un significado puede emerger gradualmente
+    en lugar de colapsar instantáneamente.
+    
+    Args:
+        estado: Estado inicial en superposición
+        fuerza: Intensidad de cada medición (0-1)
+        n_pasos: Número de mediciones débiles
+    
+    Returns:
+        (significante_final, estado_final, registro_de_evolucion)
+    """
+    registro = []
+    estado_actual = SignoCuanto(estado.significantes.copy(), estado.amplitudes.copy())
+    
+    for paso in range(n_pasos):
+        # Calcular probabilidades actuales
+        probs = np.abs(estado_actual.amplitudes) ** 2
+        
+        # Aplicar medición débil (contracción parcial)
+        factor_contraccion = 1 - fuerza
+        nuevas_amplitudes = estado_actual.amplitudes * (1 + factor_contraccion * probs)
+        
+        # Normalizar
+        nuevas_amplitudes = nuevas_amplitudes / np.linalg.norm(nuevas_amplitudes)
+        
+        registro.append({
+            "paso": paso,
+            "amplitudes": nuevas_amplitudes.copy(),
+            "entropia": -np.sum(probs * np.log(probs + 1e-10))
+        })
+        
+        estado_actual.amplitudes = nuevas_amplitudes
+    
+    # Colapso final (medición fuerte)
+    resultado_final, estado_final, _ = colapso_parole(estado_actual)
+    
+    return resultado_final, estado_final, registro
+
+
+def realidades_alternativas(
+    estado: SignoCuanto,
+    n_realidades: int = 10,
+    contexto: Optional[ContextoEnunciativo] = None
+) -> Dict[str, List[str]]:
+    """
+    Genera múltiples realidades emergentes del mismo estado inicial.
+    
+    Ilustra cómo diferentes actos de parole producen diferentes
+    realidades semióticas desde la misma lengua potencial.
+    
+    Args:
+        estado: Estado inicial
+        n_realidades: Número de realidades a generar
+        contexto: Contexto enunciativo
+    
+    Returns:
+        Diccionario con las realidades generadas
+    """
+    realidades = {}
+    
+    for i in range(n_realidades):
+        # Copiar estado original
+        estado_copia = SignoCuanto(estado.significantes.copy(), estado.amplitudes.copy())
+        resultado, _, info = colapso_parole(estado_copia, contexto)
+        realidades[f"realidad_{i+1}"] = {
+            "significante": resultado,
+            "probabilidad_original": info["probabilidades_originales"][
+                estado.significantes.index(resultado)
+            ],
+            "incertidumbre": info["incertidumbre_medicion"]
+        }
+    
+    return realidades
+
+
+# Alias conceptuales
+habla = colapso_parole
+acto_de_significacion = colapso_parole
+emergencia_de_realidad = colapso_parole
