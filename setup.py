@@ -7,8 +7,16 @@ from setuptools import setup, find_packages
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-with open("requirements.txt", "r", encoding="utf-8") as f:
-    requirements = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+# Dependencias runtime: solo lo que el paquete necesita para funcionar.
+# Las herramientas de desarrollo (pytest, black, mypy) van en extras_require["dev"],
+# no aquí — de lo contrario se instalan en producción con cada `pip install`.
+INSTALL_REQUIRES = [
+    "numpy>=1.21.0",
+    "scipy>=1.7.0",
+    "matplotlib>=3.4.0",
+    "jupyter>=1.0.0",
+    "ipywidgets>=7.6.0",
+]
 
 setup(
     name="saussure-quantum-fusion",
@@ -34,9 +42,16 @@ setup(
         "Topic :: Text Processing :: Linguistic",
     ],
     python_requires=">=3.8",
-    install_requires=requirements,
+    install_requires=INSTALL_REQUIRES,
     extras_require={
-        "dev": ["pytest>=6.0", "black>=21.0", "mypy>=0.910"],
+        # Instalar con: pip install -e ".[dev]"
+        "dev": [
+            "pytest>=6.0.0",
+            "pytest-cov>=2.12.0",
+            "black>=21.0.0",
+            "mypy>=0.910",
+        ],
+        # Instalar con: pip install -e ".[quantum]"
         "quantum": ["qiskit>=0.39.0"],
     },
     include_package_data=True,

@@ -279,16 +279,20 @@ class PrincipioIncertidumbreSaussure:
             Matriz de distribución en espacio sintagma-paradigma
         """
         psi = estado.amplitudes
-        d = self.langue.dimension  # ✅ Fix ISSUE #1: dimension vive en self.langue
+        d = self.langue.dimension
         W = np.zeros((d, d), dtype=float)
         
         for x in range(d):
             for p in range(d):
-                # Transformada de Wigner para sistemas discretos
+                # Transformada de Wigner para sistemas discretos.
+                # Se usa aritmética modular (% d) en ambos índices para:
+                #   - evitar IndexError en psi[x + xi] cuando x+xi >= d
+                #   - evitar el wrap silencioso de Python en psi[x - xi] cuando x-xi < 0,
+                #     que accedería a posiciones incorrectas del array sin lanzar excepción.
                 suma = 0
                 for xi in range(d):
                     fase = np.exp(-2j * np.pi * p * xi / d)
-                    suma += psi[x + xi] * np.conj(psi[x - xi]) * fase
+                    suma += psi[(x + xi) % d] * np.conj(psi[(x - xi) % d]) * fase
                 W[x, p] = (2 / d) * suma.real
         
         return W
