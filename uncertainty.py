@@ -279,7 +279,7 @@ class PrincipioIncertidumbreSaussure:
             Matriz de distribución en espacio sintagma-paradigma
         """
         psi = estado.amplitudes
-        d = self.dimension
+        d = self.langue.dimension  # ✅ Fix ISSUE #1: dimension vive en self.langue
         W = np.zeros((d, d), dtype=float)
         
         for x in range(d):
