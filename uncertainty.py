@@ -61,38 +61,64 @@ class ObservablesSaussureanos:
     def _construir_paradigma(self) -> np.ndarray:
         """
         Operador Paradigma (momento lingüístico).
-        
+
         Representa la capacidad de sustitución del signo,
         sus alternativas posibles en el sistema.
-        
+
         Análogo al operador momento: P = -iℏ·d/dx
-        En base discreta: matriz de desplazamiento
+        En base discreta: diferencias finitas con condiciones de borde periódicas.
+
+        Nota matemática — limitación fundamental:
+            La relación [S, P] = iℏ·I es IMPOSIBLE en dimensión finita.
+            Prueba: Tr([S,P]) = Tr(SP) - Tr(PS) = 0 (ciclicidad de la traza),
+            pero Tr(iℏI) = iℏ·d ≠ 0 para cualquier d finita.
+            Ninguna implementación discreta puede satisfacerla exactamente.
+            Se usan condiciones periódicas porque son consistentes con la
+            física de un sistema discreto circular (lattice) y minimizan
+            los artefactos de borde frente al operador tridiagonal abierto.
         """
-        # Construir matriz de momento (diferencias finitas)
         P = np.zeros((self.dimension, self.dimension), dtype=complex)
-        
-        for i in range(self.dimension):
-            # Derivada discreta hacia adelante
-            if i < self.dimension - 1:
-                P[i, i+1] = -1j * self.hbar / 2
-                P[i+1, i] = 1j * self.hbar / 2
-        
+        d = self.dimension
+        for i in range(d):
+            # Diferencias finitas centradas con borde periódico:
+            # evita los efectos de borde del operador tridiagonal abierto
+            P[i, (i + 1) % d] = -1j * self.hbar / 2
+            P[i, (i - 1) % d] =  1j * self.hbar / 2
         return P
-    
+
     def _calcular_conmutador(self) -> np.ndarray:
         """Calcular [S, P] = S·P - P·S"""
         return self.S @ self.P - self.P @ self.S
-    
+
     def verificar_conmutacion(self, tolerancia: float = 1e-10) -> bool:
         """
-        Verificar que [S, P] ≈ i·ℏ·I
-        
+        Verificar que [S, P] ≈ i·ℏ·I e informar el error cuantitativo.
+
+        Nota: en dimensión finita [S,P] = iℏI es matemáticamente imposible
+        (ver docstring de _construir_paradigma). Este método siempre retornará
+        False para cualquier implementación discreta. Se mantiene por
+        compatibilidad de API; usar error_conmutacion() para diagnóstico.
+
         Returns:
-            True si se cumple la relación de conmutación
+            True si el error es menor que tolerancia (nunca en dimensión finita)
         """
         esperado = 1j * self.hbar * np.eye(self.dimension)
         diferencia = np.linalg.norm(self._conmutador - esperado)
         return diferencia < tolerancia
+
+    def error_conmutacion(self) -> float:
+        """
+        Retorna la norma de Frobenius de ([S,P] - iℏI).
+
+        Más útil que verificar_conmutacion() para sistemas discretos, donde
+        el error es no nulo por construcción pero acotado y reproducible.
+        Un valor menor indica mejor aproximación a la relación canónica.
+
+        Returns:
+            Error cuantitativo de la relación de conmutación
+        """
+        esperado = 1j * self.hbar * np.eye(self.dimension)
+        return float(np.linalg.norm(self._conmutador - esperado))
     
     def incertidumbre(self, estado: SignoCuanto) -> Tuple[float, float, float]:
         """

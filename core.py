@@ -76,27 +76,35 @@ class SignoCuanto:
             
         return float(np.abs(self.amplitudes[idx]) ** 2)
     
-    def colapsar(self, idx: Optional[int] = None) -> str:
+    def colapsar(self, idx: Optional[int] = None) -> tuple:
         """
         Acto de parole: colapsar la superposición a un significante.
-        
+
+        Retorna el significante resultante Y un nuevo SignoCuanto colapsado,
+        sin modificar el estado original (inmutable, consistente con colapso_parole()).
+
         Args:
             idx: Índice específico (para pruebas) o None para muestreo probabilístico
-        
+
         Returns:
-            El significante resultante del colapso
+            (significante, estado_colapsado) — tupla con el significante elegido
+            y un nuevo SignoCuanto con amplitudes colapsadas al estado base idx.
+
+        Note:
+            Versiones anteriores mutaban self.amplitudes in-place y retornaban
+            solo el str. La firma cambió a tupla para ser consistente con
+            colapso_parole(). Si solo necesitás el significante: sig, _ = signo.colapsar()
         """
         if idx is None:
-            # Muestreo según |amplitud|^2
             probabilidades = np.abs(self.amplitudes) ** 2
             idx = np.random.choice(self.dimension, p=probabilidades)
-        
-        # Colapso: el estado se convierte en un vector base
-        nueva_amplitud = np.zeros(self.dimension, dtype=complex)
-        nueva_amplitud[idx] = 1.0
-        self.amplitudes = nueva_amplitud
-        
-        return self.significantes[idx]
+
+        # Construir el estado colapsado como objeto nuevo, sin mutar self
+        amplitudes_colapsadas = np.zeros(self.dimension, dtype=complex)
+        amplitudes_colapsadas[idx] = 1.0
+        estado_colapsado = SignoCuanto(self.significantes.copy(), amplitudes_colapsadas)
+
+        return self.significantes[idx], estado_colapsado
     
     def densidad(self) -> np.ndarray:
         """
@@ -137,17 +145,29 @@ class Langue:
     similar al espacio de estados de un sistema cuántico.
     """
     
-    def __init__(self, dimension: int, nombre: str = "Langue"):
+    def __init__(self, dimension: int, nombre: str = "Langue",
+                 terminos: Optional[List[str]] = None):
         """
         Inicializar el sistema lengua.
-        
+
         Args:
             dimension: Dimensión del espacio de Hilbert
             nombre: Nombre identificador del sistema
+            terminos: Etiquetas personalizadas para los términos base (opcional).
+                      Si se omite, se generan automáticamente como "término_0", etc.
+                      Debe tener exactamente `dimension` elementos si se provee.
+
+        Example:
+            >>> lang = Langue(3, terminos=["/p/", "/b/", "/t/"])
         """
+        if terminos is not None and len(terminos) != dimension:
+            raise ValueError(
+                f"'terminos' debe tener {dimension} elementos, "
+                f"pero se recibieron {len(terminos)}"
+            )
         self.dimension = dimension
         self.nombre = nombre
-        self._base = [f"término_{i}" for i in range(dimension)]
+        self._base = terminos if terminos is not None else [f"término_{i}" for i in range(dimension)]
     
     def estado_base(self, idx: int) -> SignoCuanto:
         """

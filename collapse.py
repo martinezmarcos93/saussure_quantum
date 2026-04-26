@@ -93,10 +93,14 @@ def colapso_parole(
     else:
         idx = np.random.choice(estado.dimension, p=probabilidades)
     
-    # 6. Colapsar el estado
-    nuevo_estado = SignoCuanto(estado.significantes.copy(), None)
-    nuevo_estado.amplitudes = np.zeros(estado.dimension, dtype=complex)
-    nuevo_estado.amplitudes[idx] = 1.0
+    # 6. Colapsar el estado.
+    # Se construye el vector colapsado antes de llamar al constructor para
+    # evitar el estado inconsistente que surgía de crear SignoCuanto(sigs, None)
+    # (amplitudes uniformes + normalizar()) y luego sobreescribir .amplitudes
+    # directamente, dejando el objeto temporalmente con norma cero.
+    amplitudes_colapsadas = np.zeros(estado.dimension, dtype=complex)
+    amplitudes_colapsadas[idx] = 1.0
+    nuevo_estado = SignoCuanto(estado.significantes.copy(), amplitudes_colapsadas)
     
     # 7. Registrar información de la medición
     info = {
@@ -230,43 +234,53 @@ def medicion_debil(
 ) -> Tuple[str, SignoCuanto, List[Dict]]:
     """
     Mediciones débiles sucesivas (colapso gradual).
-    
+
     Simula cómo un significado puede emerger gradualmente
     en lugar de colapsar instantáneamente.
-    
+
+    Cada paso aplica un operador de contracción parcial: las componentes
+    con mayor probabilidad se refuerzan ligeramente y las débiles decaen,
+    reduciendo la entropía de forma progresiva hasta el colapso final.
+
+    La fórmula de contracción es:
+        peso_i = (1 - fuerza) + fuerza * prob_i
+    lo que garantiza peso_i ∈ (1-fuerza, 1), es decir, siempre < 1
+    para las componentes débiles → contracción genuina hacia la dominante.
+
     Args:
         estado: Estado inicial en superposición
-        fuerza: Intensidad de cada medición (0-1)
-        n_pasos: Número de mediciones débiles
-    
+        fuerza: Intensidad de cada medición (0-1).
+                0 = sin efecto, 1 = colapso inmediato.
+        n_pasos: Número de mediciones débiles antes del colapso final
+
     Returns:
         (significante_final, estado_final, registro_de_evolucion)
     """
     registro = []
     estado_actual = SignoCuanto(estado.significantes.copy(), estado.amplitudes.copy())
-    
+
     for paso in range(n_pasos):
-        # Calcular probabilidades actuales
         probs = np.abs(estado_actual.amplitudes) ** 2
-        
-        # Aplicar medición débil (contracción parcial)
-        factor_contraccion = 1 - fuerza
-        nuevas_amplitudes = estado_actual.amplitudes * (1 + factor_contraccion * probs)
-        
-        # Normalizar
+
+        # Pesos de contracción: ∈ (1-fuerza, 1) para cada componente.
+        # Las componentes débiles (prob ≈ 0) reciben peso ≈ (1-fuerza) < 1 → decaen.
+        # Las componentes fuertes (prob ≈ 1) reciben peso ≈ 1 → se mantienen.
+        # Esto modela genuinamente el colapso parcial de una medición débil.
+        pesos = (1 - fuerza) + fuerza * probs
+        nuevas_amplitudes = estado_actual.amplitudes * pesos
         nuevas_amplitudes = nuevas_amplitudes / np.linalg.norm(nuevas_amplitudes)
-        
+
         registro.append({
             "paso": paso,
             "amplitudes": nuevas_amplitudes.copy(),
             "entropia": -np.sum(probs * np.log(probs + 1e-10))
         })
-        
+
         estado_actual.amplitudes = nuevas_amplitudes
-    
+
     # Colapso final (medición fuerte)
     resultado_final, estado_final, _ = colapso_parole(estado_actual)
-    
+
     return resultado_final, estado_final, registro
 
 

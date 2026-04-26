@@ -6,6 +6,7 @@ superposiciones de palabras y colapsos probabilísticos.
 """
 
 import random
+import copy
 import numpy as np
 from saussure_quantum import SignoCuanto, Langue
 from saussure_quantum.collapse import colapso_parole, ContextoEnunciativo
@@ -47,17 +48,19 @@ class PoetaCuantico:
     def palabra_aleatoria(self, categoria: str, humor: float = 1.0) -> str:
         """
         Genera una palabra colapsando una categoría.
-        
+
         Args:
             categoria: "sustantivos", "verbos", "adjetivos", "conectores"
             humor: Temperatura semántica (1.0 = normal, >1 = más caótico)
         """
         if categoria not in self.diccionario:
             return "?"
-        
-        signo = self.diccionario[categoria]
+
+        # deepcopy para que cualquier mutación del SignoCuanto (ej. llamada directa
+        # a .colapsar()) no corrompa el estado del diccionario compartido entre poemas.
+        signo = copy.deepcopy(self.diccionario[categoria])
         contexto = ContextoEnunciativo(temperatura_semantica=humor)
-        
+
         palabra, _, info = colapso_parole(signo, contexto)
         return palabra
     

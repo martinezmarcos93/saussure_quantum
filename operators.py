@@ -36,12 +36,25 @@ def operador_diferencia(estados: List[SignoCuanto], normalizar: bool = True) -> 
     """
     if len(estados) < 2:
         raise ValueError("Se necesitan al menos 2 estados para la diferencia")
-    
-    # Verificar que todos tengan la misma dimensión
+
+    # Verificar dimensión y que todos los significantes sean iguales.
+    # Solo verificar dimensión no es suficiente: estados con etiquetas distintas
+    # pero igual dimensión producirían un resultado con significantes arbitrarios
+    # (los del primer estado) sin ninguna advertencia.
     dim = estados[0].dimension
-    for e in estados:
+    sigs_ref = estados[0].significantes
+    for i, e in enumerate(estados[1:], start=1):
         if e.dimension != dim:
-            raise ValueError("Todos los estados deben tener la misma dimensión")
+            raise ValueError(
+                f"Todos los estados deben tener la misma dimensión. "
+                f"estados[0].dimension={dim}, estados[{i}].dimension={e.dimension}"
+            )
+        if e.significantes != sigs_ref:
+            raise ValueError(
+                f"Todos los estados deben tener los mismos significantes. "
+                f"estados[0].significantes={sigs_ref}, "
+                f"estados[{i}].significantes={e.significantes}"
+            )
     
     # Sumar todas las diferencias pares
     suma_amplitudes = np.zeros(dim, dtype=complex)

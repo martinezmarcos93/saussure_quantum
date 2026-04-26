@@ -32,15 +32,30 @@ class TestObservablesSaussureanos:
         assert np.allclose(obs.S, expected_S)
     
     def test_conmutacion(self):
-        """Test relación de conmutación [S, P] = iℏ·I"""
+        """
+        Test del error de conmutación [S, P] - iℏ·I.
+
+        La relación [S,P] = iℏI es matemáticamente imposible en dimensión
+        finita (Tr([S,P])=0 pero Tr(iℏI)=iℏd ≠ 0), por lo que ninguna
+        implementación discreta puede satisfacerla exactamente.
+        Se verifica que el error cuantitativo sea finito, reproducible
+        y acotado de forma razonable.
+        """
         obs = ObservablesSaussureanos(5, hbar=1.0)
-        assert obs.verificar_conmutacion(tolerancia=1e-5)
-    
+        error = obs.error_conmutacion()
+        assert np.isfinite(error), "El error de conmutación debe ser finito"
+        assert error > 0, "En dimensión finita el error siempre es positivo"
+        # El error escala con sqrt(d) * hbar; para d=5 esperamos < 10
+        assert error < 10.0, f"Error de conmutación inesperadamente alto: {error:.4f}"
+
     def test_conmutacion_hbar_custom(self):
-        """Test con ℏ personalizado"""
+        """El error de conmutación escala linealmente con hbar."""
         hbar = 2.0
-        obs = ObservablesSaussureanos(5, hbar=hbar)
-        assert obs.verificar_conmutacion(tolerancia=1e-5)
+        obs1 = ObservablesSaussureanos(5, hbar=1.0)
+        obs2 = ObservablesSaussureanos(5, hbar=hbar)
+        # Error debe escalar con hbar
+        assert np.isclose(obs2.error_conmutacion(), hbar * obs1.error_conmutacion(), rtol=1e-6), \
+            "El error de conmutación debe ser proporcional a hbar"
     
     def test_incertidumbre_estado_base(self):
         """Test incertidumbre para estado base"""
