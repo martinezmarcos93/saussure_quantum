@@ -13,7 +13,7 @@ from saussure_quantum.uncertainty import (
     PrincipioIncertidumbreSaussure,
     incertidumbre_saussure_heisenberg
 )
-from saussure_quantum.collapse import colapso_parole
+
 
 
 class SimuladorIndeterminacion:
