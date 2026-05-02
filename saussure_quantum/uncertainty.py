@@ -397,13 +397,15 @@ def paradoja_del_observador_linguistico(estado: SignoCuanto) -> Dict:
             "delta_S": despues_S["delta_sintagma"],
             "delta_P": despues_S["delta_paradigma"],
             "producto": despues_S["producto_incertidumbre"],
-            "cambio_significativo": despues_S["delta_P"] > original["delta_P"] * 1.5
+            # Usar claves de analizar_estado() (delta_paradigma/delta_sintagma),
+            # no las del dict de salida (delta_P/delta_S) que aún no existen aquí.
+            "cambio_significativo": despues_S["delta_paradigma"] > original["delta_paradigma"] * 1.5
         },
         "despues_medir_paradigma": {
             "delta_S": despues_P["delta_sintagma"],
             "delta_P": despues_P["delta_paradigma"],
             "producto": despues_P["producto_incertidumbre"],
-            "cambio_significativo": despues_P["delta_S"] > original["delta_S"] * 1.5
+            "cambio_significativo": despues_P["delta_sintagma"] > original["delta_sintagma"] * 1.5
         },
         "principio_demostrado": True
     }

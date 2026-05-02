@@ -41,6 +41,7 @@ El mundo no está hecho de objetos, sino de relaciones de oposición. Una "silla
 - ✅ **Mediciones débiles**: Colapso gradual del significado
 - ✅ **Realidades alternativas**: Múltiples emergencias desde el mismo estado inicial
 - ✅ **Poeta cuántico**: Aplicación creativa que genera poesía por colapso cuántico
+- ✅ **Interfaz gráfica (GUI)**: Acceso visual a todas las herramientas sin línea de comandos
 
 ---
 
@@ -48,19 +49,22 @@ El mundo no está hecho de objetos, sino de relaciones de oposición. Una "silla
 
 ```bash
 # Clonar repositorio
-git clone https://github.com/tuusuario/saussure-quantum-fusion.git
+git clone https://github.com/doomhammer793/saussure-quantum-fusion.git
 cd saussure-quantum-fusion
 
 # Instalar dependencias
 pip install -r requirements.txt
 
-# Instalar el paquete en modo desarrollo
+# Instalar el paquete en modo desarrollo (necesario para los imports)
 pip install -e .
 
-# (Opcional) Para pruebas unitarias
-pip install pytest
-pytest tests/ -v
+# Ejecutar la interfaz gráfica
+python gui.py
 ```
+
+> ⚠️ **Importante:** el paso `pip install -e .` es necesario para que todos los módulos
+> puedan importar `saussure_quantum` correctamente, tanto desde la raíz como desde
+> las carpetas `examples/` y `tests/`.
 
 ### Dependencias mínimas
 
@@ -70,9 +74,38 @@ scipy>=1.7.0       # Operaciones avanzadas
 matplotlib>=3.4.0  # Visualizaciones
 ```
 
+### Dependencias opcionales
+
+```bash
+# Para herramientas de desarrollo (tests, linting)
+pip install -e ".[dev]"
+
+# Para integración futura con hardware cuántico real
+pip install -e ".[quantum]"
+```
+
 ---
 
-## 📓 Primeros pasos
+## 🖥️ Interfaz gráfica
+
+La forma más sencilla de explorar el proyecto es a través de la GUI:
+
+```bash
+python gui.py
+```
+
+La interfaz incluye cuatro paneles navegables desde el sidebar:
+
+| Panel | Descripción |
+|---|---|
+| **◈ Poeta cuántico** | Genera versos por colapso de superposiciones semánticas. Sliders para número de versos, temperatura ℏ y modo (normal / caótico / mínima incertidumbre). Muestra métricas de palabras, colapsos y entropía media. |
+| **◉ Simulador** | Explora el principio ΔS·ΔP ≥ ℏ/2. Elegís el tipo de estado (sintagmático puro, paradigmático puro, mínima incertidumbre, uniforme), la dimensión y la posición, y analizás o demostrás el principio completo. |
+| **△ Incertidumbre** | Ingresás tus propios significantes y amplitudes, calculás la incertidumbre con barras de probabilidad, o ejecutás la paradoja del observador para ver cómo medir un eje perturba el otro. |
+| **⊗ Op. Diferencia** | Ingresás signos línea por línea, aplicás D̂, analizás la negatividad de cada signo, o calculás la similitud diferencial entre todos los pares del sistema. |
+
+---
+
+## 📓 Primeros pasos (uso programático)
 
 ### Ejemplo 1: Crear un signo-cuanto
 
@@ -87,8 +120,8 @@ signo = SignoCuanto(
 
 print(signo)
 # Signo-cuanto (d=3):
-#   🌞 sol: |0.816|² = 66.6%
-#   🌙 luna: |0.408|² = 16.7%
+#   🌞 sol:     |0.816|² = 66.6%
+#   🌙 luna:    |0.408|² = 16.7%
 #   ⭐ estrella: |0.408|² = 16.7%
 ```
 
@@ -97,7 +130,7 @@ print(signo)
 ```python
 from saussure_quantum.collapse import colapso_parole
 
-# El hablante "dice" la palabra -> la realidad emerge
+# El hablante "dice" la palabra → la realidad emerge
 realidad, estado_colapsado, info = colapso_parole(signo)
 print(f"El hablante dijo: {realidad}")
 # Salida posible: "El hablante dijo: 🌞 sol"
@@ -125,26 +158,23 @@ print(diferencia_pura)
 from saussure_quantum import Langue
 from saussure_quantum.uncertainty import incertidumbre_saussure_heisenberg
 
-# Crear un sistema lengua
-lang = Langue(10)
+# Crear un sistema lengua con términos personalizados
+lang = Langue(10, terminos=["the","a","of","in","to","and","is","was","he","she"])
 
 # Estado con posición sintagmática bien definida
 estado = lang.estado_base(0)
 
 analisis = incertidumbre_saussure_heisenberg(estado)
-print(f"ΔS (sintagma): {analisis['delta_sintagma']:.3f}")
+print(f"ΔS (sintagma):  {analisis['delta_sintagma']:.3f}")
 print(f"ΔP (paradigma): {analisis['delta_paradigma']:.3f}")
 print(f"ΔS·ΔP = {analisis['producto_incertidumbre']:.3f} ≥ ℏ/2 = 0.5")
-# ΔS·ΔP = ∞ ≥ 0.5 (incertidumbre máxima en paradigma)
 ```
 
 ---
 
 ## 🎨 Aplicaciones incluidas
 
-### Poeta Cuántico
-
-Genera poesía usando colapsos cuánticos:
+### Poeta Cuántico (línea de comandos)
 
 ```bash
 python examples/generador_poetico_cuantico.py
@@ -158,6 +188,12 @@ Amor nace eterno
 Profundo caos vuela
 Sueña luz fugaz
 Cuando el infinito asciende
+```
+
+### Simulador de incertidumbre (línea de comandos)
+
+```bash
+python examples/simulador_indeterminacion.py
 ```
 
 ---
@@ -197,16 +233,20 @@ Langue (Espacio de Hilbert)
 **Formalismo matemático:**
 
 ```
-|signo⟩ = Σᵢ αᵢ |sᵢ⟩     donde αᵢ ∈ ℂ
+|signo⟩ = Σᵢ αᵢ |sᵢ⟩      donde αᵢ ∈ ℂ
 
 |realidad⟩ = M̂_parole |lengua⟩
 
-D̂ = Σᵢ﹤ⱼ (|sᵢ⟩ − |sⱼ⟩)   (operador diferencia)
+D̂ = Σᵢ﹤ⱼ (|sᵢ⟩ − |sⱼ⟩)    (operador diferencia)
 
-[Ŝ, P̂] = iℏ_semiótico      (relación de conmutación)
+[Ŝ, P̂] = iℏ_semiótico       (relación de conmutación — aproximada en dim. finita)
 
-ΔS · ΔP ≥ ℏ_semiótico / 2  (principio de incertidumbre)
+ΔS · ΔP ≥ ℏ_semiótico / 2   (principio de incertidumbre)
 ```
+
+> **Nota matemática:** La relación `[Ŝ, P̂] = iℏI` es imposible en dimensión finita
+> (Tr([S,P]) = 0 pero Tr(iℏI) = iℏd ≠ 0). El operador P̂ usa condiciones de borde
+> periódicas que minimizan el error de borde. Ver `error_conmutacion()` para diagnóstico.
 
 ---
 
@@ -219,13 +259,14 @@ saussure-quantum-fusion/
 ├── LICENSE
 ├── requirements.txt
 ├── setup.py
+├── gui.py                          ← Interfaz gráfica (entrada principal)
 │
-├── saussure_quantum/
+├── saussure_quantum/               ← Paquete Python
 │   ├── __init__.py
-│   ├── core.py
-│   ├── operators.py
-│   ├── collapse.py
-│   └── uncertainty.py
+│   ├── core.py                     ← SignoCuanto, Langue
+│   ├── operators.py                ← OperadorDiferencia, similitud_diferencial
+│   ├── collapse.py                 ← colapso_parole, medicion_debil
+│   └── uncertainty.py              ← PrincipioIncertidumbreSaussure
 │
 ├── notebooks/
 │   ├── 01_intro_signo_cuanto.ipynb
@@ -262,10 +303,13 @@ saussure-quantum-fusion/
 ## 🗺️ Roadmap
 
 - [x] Implementación base (vectores, colapso)
-- [x] Operador diferencia
-- [x] Principio de incertidumbre
+- [x] Operador diferencia D̂
+- [x] Principio de incertidumbre Saussure-Heisenberg
 - [x] Pruebas unitarias
 - [x] Poeta cuántico (aplicación demo)
+- [x] Interfaz gráfica con todas las herramientas (GUI Tkinter)
+- [x] Langue con términos personalizados
+- [x] Medición débil con contracción genuina
 - [ ] Entrelazamiento semántico (correlaciones no locales)
 - [ ] Integración con Qiskit (hardware cuántico real)
 - [ ] Notebooks interactivos completos
@@ -326,11 +370,11 @@ MIT © Marcos Martínez — Ver archivo [LICENSE](LICENSE)
 Si usas este trabajo en investigación académica:
 
 ```bibtex
-@software{tu_nombre_2026_saussure_quantum,
-  author = {[Tu Apellido, Nombre]},
+@software{martinez_2026_saussure_quantum,
+  author = {Martínez, Marcos},
   title  = {Saussure-Quantum Fusion: A Computational Implementation},
   year   = {2026},
-  url    = {https://github.com/tuusuario/saussure-quantum-fusion}
+  url    = {https://github.com/doomhammer793/saussure-quantum-fusion}
 }
 ```
 
@@ -362,7 +406,9 @@ Si usas este trabajo en investigación académica:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-> "No hay una realidad en sí. Hay realidades epistémicas producidas por el acoplamiento de dos sistemas diferenciales: el lenguaje y el cuanto. El ser es un efecto de la diferencia observada."
+> "No hay una realidad en sí. Hay realidades epistémicas producidas por el acoplamiento
+> de dos sistemas diferenciales: el lenguaje y el cuanto. El ser es un efecto de la
+> diferencia observada."
 >
 > — *Fusión Saussure–Cuántica, 2026*
 

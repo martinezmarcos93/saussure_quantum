@@ -1,0 +1,875 @@
+"""
+gui.py — Interfaz gráfica principal de Saussure-Quantum Fusion
+
+Ejecutar desde la raíz del proyecto:
+    python gui.py
+
+Requiere que el paquete esté instalado o que saussure_quantum/ esté en el mismo directorio.
+"""
+
+import tkinter as tk
+from tkinter import ttk, scrolledtext
+import numpy as np
+import threading
+import random
+
+# ── Importar el paquete ───────────────────────────────────────────────────────
+try:
+    from saussure_quantum import SignoCuanto, Langue
+    from saussure_quantum.collapse import (
+        colapso_parole, ContextoEnunciativo, medicion_debil
+    )
+    from saussure_quantum.operators import (
+        operador_diferencia, OperadorDiferencia, principio_negatividad
+    )
+    from saussure_quantum.uncertainty import (
+        PrincipioIncertidumbreSaussure, ObservablesSaussureanos, HBAR_SEMIOTICO
+    )
+    PAQUETE_OK = True
+except ImportError as e:
+    PAQUETE_OK = False
+    IMPORT_ERROR = str(e)
+
+
+# ── Paleta de colores ─────────────────────────────────────────────────────────
+COLORES = {
+    "bg":          "#0F0F1A",
+    "sidebar":     "#13131F",
+    "panel":       "#1A1A2E",
+    "borde":       "#2A2A45",
+    "acento":      "#7F77DD",
+    "acento2":     "#1D9E75",
+    "acento3":     "#EF9F27",
+    "acento4":     "#D85A30",
+    "texto":       "#E8E6F0",
+    "texto_sec":   "#8A87A0",
+    "entrada":     "#22223A",
+    "salida_bg":   "#0D0D18",
+    "ok":          "#1D9E75",
+    "warn":        "#EF9F27",
+    "error":       "#E24B4A",
+}
+
+FUENTE_TITULO  = ("Consolas", 13, "bold")
+FUENTE_LABEL   = ("Consolas", 10)
+FUENTE_MONO    = ("Consolas", 11)
+FUENTE_SMALL   = ("Consolas", 9)
+FUENTE_SIDEBAR = ("Consolas", 11)
+FUENTE_GRANDE  = ("Consolas", 22, "bold")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  VENTANA PRINCIPAL
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class AppSaussureQuantum(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Saussure–Quantum Fusion  v0.1.0")
+        self.geometry("1050x700")
+        self.minsize(900, 600)
+        self.configure(bg=COLORES["bg"])
+        self.resizable(True, True)
+
+        self._build_layout()
+        self._mostrar_panel("poeta")
+
+        if not PAQUETE_OK:
+            self._mostrar_error_importacion()
+
+    # ── Layout principal ──────────────────────────────────────────────────────
+    def _build_layout(self):
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(0, weight=1)
+
+        # Sidebar
+        self.sidebar = tk.Frame(self, bg=COLORES["sidebar"], width=190)
+        self.sidebar.grid(row=0, column=0, sticky="ns")
+        self.sidebar.grid_propagate(False)
+        self._build_sidebar()
+
+        # Separador vertical
+        sep = tk.Frame(self, bg=COLORES["borde"], width=1)
+        sep.grid(row=0, column=0, sticky="nse")
+
+        # Área principal
+        self.main = tk.Frame(self, bg=COLORES["bg"])
+        self.main.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
+        self.main.columnconfigure(0, weight=1)
+        self.main.rowconfigure(0, weight=1)
+
+        # Paneles
+        self.paneles = {}
+        self.paneles["poeta"]        = PanelPoeta(self.main)
+        self.paneles["simulador"]    = PanelSimulador(self.main)
+        self.paneles["incertidumbre"]= PanelIncertidumbre(self.main)
+        self.paneles["diferencia"]   = PanelDiferencia(self.main)
+
+        for p in self.paneles.values():
+            p.grid(row=0, column=0, sticky="nsew")
+
+    def _build_sidebar(self):
+        # Logo / título
+        tk.Label(
+            self.sidebar, text="⟨ψ|", font=("Consolas", 28, "bold"),
+            bg=COLORES["sidebar"], fg=COLORES["acento"]
+        ).pack(pady=(24, 0))
+        tk.Label(
+            self.sidebar, text="Saussure\nQuantum", font=("Consolas", 10),
+            bg=COLORES["sidebar"], fg=COLORES["texto_sec"], justify="center"
+        ).pack(pady=(2, 20))
+
+        sep = tk.Frame(self.sidebar, bg=COLORES["borde"], height=1)
+        sep.pack(fill="x", padx=16, pady=(0, 16))
+
+        # Items de navegación
+        self.nav_botones = {}
+        items = [
+            ("poeta",         "◈  Poeta cuántico",   COLORES["acento"]),
+            ("simulador",     "◉  Simulador",         COLORES["acento2"]),
+            ("incertidumbre", "△  Incertidumbre",     COLORES["acento3"]),
+            ("diferencia",    "⊗  Op. Diferencia",    COLORES["acento4"]),
+        ]
+        for key, label, color in items:
+            btn = tk.Label(
+                self.sidebar, text=label, font=FUENTE_SIDEBAR,
+                bg=COLORES["sidebar"], fg=COLORES["texto_sec"],
+                anchor="w", padx=20, pady=10, cursor="hand2"
+            )
+            btn.pack(fill="x")
+            btn.bind("<Button-1>", lambda e, k=key: self._mostrar_panel(k))
+            btn.bind("<Enter>",    lambda e, b=btn: b.configure(fg=COLORES["texto"]))
+            btn.bind("<Leave>",    lambda e, b=btn, k=key: self._hover_leave(b, k))
+            self.nav_botones[key] = (btn, color)
+
+        # Versión abajo
+        tk.Label(
+            self.sidebar, text="v0.1.0", font=FUENTE_SMALL,
+            bg=COLORES["sidebar"], fg=COLORES["borde"]
+        ).pack(side="bottom", pady=12)
+
+    def _mostrar_panel(self, key):
+        self.panel_activo = key
+        for k, (btn, color) in self.nav_botones.items():
+            if k == key:
+                btn.configure(bg=COLORES["panel"], fg=color)
+            else:
+                btn.configure(bg=COLORES["sidebar"], fg=COLORES["texto_sec"])
+        self.paneles[key].tkraise()
+
+    def _hover_leave(self, btn, key):
+        if key != self.panel_activo:
+            btn.configure(fg=COLORES["texto_sec"])
+
+    def _mostrar_error_importacion(self):
+        ventana = tk.Toplevel(self)
+        ventana.title("Error de importación")
+        ventana.configure(bg=COLORES["bg"])
+        ventana.geometry("500x200")
+        tk.Label(
+            ventana,
+            text="No se pudo importar saussure_quantum",
+            font=FUENTE_TITULO, bg=COLORES["bg"], fg=COLORES["error"]
+        ).pack(pady=20)
+        tk.Label(
+            ventana, text=IMPORT_ERROR, font=FUENTE_SMALL,
+            bg=COLORES["bg"], fg=COLORES["texto_sec"], wraplength=460
+        ).pack()
+        tk.Label(
+            ventana,
+            text="Asegurate de que saussure_quantum/ esté en el mismo directorio\n"
+                 "o ejecutá: pip install -e .",
+            font=FUENTE_SMALL, bg=COLORES["bg"], fg=COLORES["warn"]
+        ).pack(pady=16)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  WIDGETS REUTILIZABLES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def label_titulo(parent, texto, color=None):
+    return tk.Label(
+        parent, text=texto, font=FUENTE_TITULO,
+        bg=COLORES["bg"], fg=color or COLORES["texto"], anchor="w"
+    )
+
+def label_sec(parent, texto):
+    return tk.Label(
+        parent, text=texto, font=FUENTE_LABEL,
+        bg=COLORES["bg"], fg=COLORES["texto_sec"], anchor="w"
+    )
+
+def seccion(parent, titulo, color):
+    f = tk.Frame(parent, bg=COLORES["panel"],
+                 highlightbackground=COLORES["borde"], highlightthickness=1)
+    tk.Label(f, text=titulo, font=FUENTE_SMALL, bg=COLORES["panel"],
+             fg=color, anchor="w", padx=10, pady=6).pack(fill="x")
+    tk.Frame(f, bg=COLORES["borde"], height=1).pack(fill="x")
+    return f
+
+def area_salida(parent, height=8):
+    txt = scrolledtext.ScrolledText(
+        parent, height=height, font=FUENTE_MONO,
+        bg=COLORES["salida_bg"], fg=COLORES["texto"],
+        insertbackground=COLORES["acento"],
+        selectbackground=COLORES["acento"],
+        relief="flat", borderwidth=0, wrap="word",
+        state="disabled"
+    )
+    return txt
+
+def escribir_salida(widget, texto, limpiar=True):
+    widget.configure(state="normal")
+    if limpiar:
+        widget.delete("1.0", "end")
+    widget.insert("end", texto)
+    widget.see("end")
+    widget.configure(state="disabled")
+
+def boton(parent, texto, comando, color=None):
+    c = color or COLORES["acento"]
+    btn = tk.Label(
+        parent, text=texto, font=FUENTE_LABEL,
+        bg=c, fg=COLORES["bg"],
+        padx=14, pady=7, cursor="hand2",
+        relief="flat"
+    )
+    btn.bind("<Button-1>", lambda e: comando())
+    btn.bind("<Enter>",    lambda e: btn.configure(bg=_aclarar(c)))
+    btn.bind("<Leave>",    lambda e: btn.configure(bg=c))
+    return btn
+
+def slider_con_label(parent, texto, desde, hasta, valor_ini, paso=1, fmt="{:.0f}"):
+    fila = tk.Frame(parent, bg=COLORES["panel"])
+    tk.Label(fila, text=texto, font=FUENTE_LABEL, bg=COLORES["panel"],
+             fg=COLORES["texto_sec"], width=18, anchor="w").pack(side="left", padx=(10,0))
+    var = tk.DoubleVar(value=valor_ini)
+    lbl_val = tk.Label(fila, text=fmt.format(valor_ini), font=FUENTE_LABEL,
+                       bg=COLORES["panel"], fg=COLORES["texto"], width=6, anchor="e")
+    lbl_val.pack(side="right", padx=10)
+    sl = ttk.Scale(fila, from_=desde, to=hasta, variable=var, orient="horizontal")
+    sl.pack(side="left", fill="x", expand=True, padx=8)
+    def _actualizar(*_):
+        lbl_val.configure(text=fmt.format(var.get()))
+    var.trace_add("write", _actualizar)
+    return fila, var
+
+def _aclarar(hex_color):
+    r = min(255, int(hex_color[1:3], 16) + 30)
+    g = min(255, int(hex_color[3:5], 16) + 30)
+    b = min(255, int(hex_color[5:7], 16) + 30)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+def metric_card(parent, label, var_texto, color):
+    f = tk.Frame(parent, bg=COLORES["panel"],
+                 highlightbackground=COLORES["borde"], highlightthickness=1)
+    tk.Label(f, text=label, font=FUENTE_SMALL, bg=COLORES["panel"],
+             fg=COLORES["texto_sec"]).pack(pady=(8,0))
+    tk.Label(f, textvariable=var_texto, font=FUENTE_GRANDE,
+             bg=COLORES["panel"], fg=color).pack(pady=(0,8))
+    return f
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  PANEL 1 — POETA CUÁNTICO
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class PanelPoeta(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, bg=COLORES["bg"])
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(2, weight=1)
+        self._build()
+
+    def _build(self):
+        # Cabecera
+        cab = tk.Frame(self, bg=COLORES["bg"])
+        cab.grid(row=0, column=0, sticky="ew", padx=24, pady=(24,0))
+        label_titulo(cab, "◈  Poeta cuántico", COLORES["acento"]).pack(anchor="w")
+        label_sec(cab, "Genera versos por colapso de superposiciones semánticas").pack(anchor="w", pady=(2,0))
+
+        # Controles
+        ctrl = seccion(self, "PARÁMETROS", COLORES["acento"])
+        ctrl.grid(row=1, column=0, sticky="ew", padx=24, pady=12)
+
+        fila1, self.var_versos = slider_con_label(ctrl, "Versos", 1, 8, 4)
+        fila1.pack(fill="x", pady=4)
+        fila2, self.var_temp = slider_con_label(ctrl, "Temperatura ℏ", 1, 30, 10,
+                                                 fmt="{:.1f}")
+        fila2.pack(fill="x", pady=4)
+
+        fila_modo = tk.Frame(ctrl, bg=COLORES["panel"])
+        tk.Label(fila_modo, text="Modo", font=FUENTE_LABEL, bg=COLORES["panel"],
+                 fg=COLORES["texto_sec"], width=18, anchor="w").pack(side="left", padx=(10,0))
+        self.var_modo = tk.StringVar(value="Normal")
+        combo = ttk.Combobox(fila_modo, textvariable=self.var_modo,
+                             values=["Normal", "Caótico", "Mínima incertidumbre"],
+                             state="readonly", font=FUENTE_LABEL, width=22)
+        combo.pack(side="left", padx=8, pady=6)
+        fila_modo.pack(fill="x", pady=4)
+
+        # Botones
+        btn_row = tk.Frame(self, bg=COLORES["bg"])
+        btn_row.grid(row=2, column=0, sticky="nw", padx=24, pady=(0,8))
+        boton(btn_row, "  Generar poema  ", self._generar,
+              COLORES["acento"]).pack(side="left", padx=(0,8))
+        boton(btn_row, "  Limpiar  ", self._limpiar,
+              COLORES["borde"]).pack(side="left")
+
+        # Salida
+        sal = seccion(self, "POEMA GENERADO", COLORES["acento"])
+        sal.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0,8))
+        self.rowconfigure(3, weight=1)
+        self.salida = area_salida(sal, height=10)
+        self.salida.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Métricas
+        met_frame = tk.Frame(self, bg=COLORES["bg"])
+        met_frame.grid(row=4, column=0, sticky="ew", padx=24, pady=(0,20))
+        for i in range(3):
+            met_frame.columnconfigure(i, weight=1)
+        self.m_palabras = tk.StringVar(value="—")
+        self.m_colapsos = tk.StringVar(value="—")
+        self.m_entropia = tk.StringVar(value="—")
+        metric_card(met_frame, "Palabras", self.m_palabras, COLORES["acento"]).grid(
+            row=0, column=0, sticky="ew", padx=(0,6))
+        metric_card(met_frame, "Colapsos", self.m_colapsos, COLORES["acento2"]).grid(
+            row=0, column=1, sticky="ew", padx=3)
+        metric_card(met_frame, "Entropía media", self.m_entropia, COLORES["acento3"]).grid(
+            row=0, column=2, sticky="ew", padx=(6,0))
+
+    def _generar(self):
+        if not PAQUETE_OK:
+            escribir_salida(self.salida, "⚠  Error: paquete no disponible.\n")
+            return
+
+        n_versos  = int(self.var_versos.get())
+        temp_raw  = self.var_temp.get() / 10.0
+        modo      = self.var_modo.get()
+
+        if modo == "Caótico":
+            humor = temp_raw * 2.5
+        elif modo == "Mínima incertidumbre":
+            humor = 0.3
+        else:
+            humor = temp_raw
+
+        diccionario = {
+            "sustantivos": SignoCuanto(
+                ["amor", "caos", "luz", "sombra", "infinito", "vacío", "tiempo", "silencio"],
+                [1, 1.2, 0.8, 0.9, 1.1, 0.7, 1.0, 0.85]
+            ),
+            "verbos": SignoCuanto(
+                ["nace", "muere", "sueña", "vuela", "cae", "asciende", "persiste", "colapsa"],
+                [1, 0.9, 1.3, 0.8, 0.6, 1.1, 0.75, 1.2]
+            ),
+            "adjetivos": SignoCuanto(
+                ["eterno", "fugaz", "profundo", "ligero", "oscuro", "brillante", "quantum", "discreto"],
+                [1.2, 0.8, 0.7, 1.1, 0.9, 1.3, 1.0, 0.6]
+            ),
+            "conectores": SignoCuanto(
+                ["y", "o", "pero", "cuando", "donde", "como", "mientras", "porque"],
+                [1.5, 0.5, 0.8, 1.2, 0.6, 0.9, 0.7, 0.4]
+            ),
+        }
+
+        estructuras = [
+            ["sustantivos", "verbos", "adjetivos"],
+            ["adjetivos", "sustantivos", "verbos"],
+            ["verbos", "sustantivos"],
+            ["conectores", "adjetivos", "sustantivos", "verbos"],
+        ]
+
+        ctx = ContextoEnunciativo(temperatura_semantica=humor)
+        versos = []
+        total_entropia = []
+        colapsos = 0
+
+        for _ in range(n_versos):
+            h = humor * (0.8 + 0.4 * np.sin(len(versos)))
+            ctx_v = ContextoEnunciativo(temperatura_semantica=h)
+            estructura = random.choice(estructuras)
+            palabras = []
+            for cat in estructura:
+                import copy
+                signo = copy.deepcopy(diccionario[cat])
+                probs = np.abs(signo.amplitudes) ** 2
+                ent = -np.sum(probs * np.log(probs + 1e-10))
+                total_entropia.append(ent)
+                palabra, _, _ = colapso_parole(signo, ctx_v)
+                palabras.append(palabra)
+                colapsos += 1
+            verso = " ".join(palabras)
+            verso = verso[0].upper() + verso[1:]
+            versos.append(verso)
+
+        poema = "\n".join(versos)
+        palabras_total = sum(len(v.split()) for v in versos)
+        entropia_media = np.mean(total_entropia) if total_entropia else 0
+
+        escribir_salida(self.salida, poema)
+        self.m_palabras.set(str(palabras_total))
+        self.m_colapsos.set(str(colapsos))
+        self.m_entropia.set(f"{entropia_media:.2f}")
+
+    def _limpiar(self):
+        escribir_salida(self.salida, "")
+        self.m_palabras.set("—")
+        self.m_colapsos.set("—")
+        self.m_entropia.set("—")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  PANEL 2 — SIMULADOR DE INCERTIDUMBRE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class PanelSimulador(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, bg=COLORES["bg"])
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(3, weight=1)
+        self._build()
+
+    def _build(self):
+        cab = tk.Frame(self, bg=COLORES["bg"])
+        cab.grid(row=0, column=0, sticky="ew", padx=24, pady=(24,0))
+        label_titulo(cab, "◉  Simulador de incertidumbre", COLORES["acento2"]).pack(anchor="w")
+        label_sec(cab, "Explora el principio ΔS·ΔP ≥ ℏ/2 en estados lingüísticos").pack(anchor="w", pady=(2,0))
+
+        ctrl = seccion(self, "CONFIGURACIÓN", COLORES["acento2"])
+        ctrl.grid(row=1, column=0, sticky="ew", padx=24, pady=12)
+
+        fila_tipo = tk.Frame(ctrl, bg=COLORES["panel"])
+        tk.Label(fila_tipo, text="Tipo de estado", font=FUENTE_LABEL,
+                 bg=COLORES["panel"], fg=COLORES["texto_sec"],
+                 width=18, anchor="w").pack(side="left", padx=(10,0))
+        self.var_tipo = tk.StringVar(value="Sintagmático puro")
+        combo = ttk.Combobox(fila_tipo, textvariable=self.var_tipo,
+                             values=["Sintagmático puro", "Paradigmático puro",
+                                     "Mínima incertidumbre", "Superposición uniforme"],
+                             state="readonly", font=FUENTE_LABEL, width=26)
+        combo.pack(side="left", padx=8, pady=6)
+        fila_tipo.pack(fill="x", pady=4)
+
+        fila_dim, self.var_dim = slider_con_label(ctrl, "Dimensión", 4, 32, 20)
+        fila_dim.pack(fill="x", pady=4)
+        fila_pos, self.var_pos = slider_con_label(ctrl, "Posición / Modo", 0, 19, 5)
+        fila_pos.pack(fill="x", pady=4)
+
+        btn_row = tk.Frame(self, bg=COLORES["bg"])
+        btn_row.grid(row=2, column=0, sticky="nw", padx=24, pady=(0,8))
+        boton(btn_row, "  Analizar estado  ", self._analizar,
+              COLORES["acento2"]).pack(side="left", padx=(0,8))
+        boton(btn_row, "  Demostrar principio  ", self._demostrar,
+              COLORES["borde"]).pack(side="left")
+
+        sal = seccion(self, "ANÁLISIS DE INCERTIDUMBRE", COLORES["acento2"])
+        sal.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0,8))
+        self.rowconfigure(3, weight=1)
+        self.salida = area_salida(sal, height=10)
+        self.salida.pack(fill="both", expand=True, padx=10, pady=10)
+
+        met_frame = tk.Frame(self, bg=COLORES["bg"])
+        met_frame.grid(row=4, column=0, sticky="ew", padx=24, pady=(0,20))
+        for i in range(3):
+            met_frame.columnconfigure(i, weight=1)
+        self.m_ds   = tk.StringVar(value="—")
+        self.m_dp   = tk.StringVar(value="—")
+        self.m_prod = tk.StringVar(value="—")
+        metric_card(met_frame, "ΔS (sintagma)", self.m_ds, COLORES["acento2"]).grid(
+            row=0, column=0, sticky="ew", padx=(0,6))
+        metric_card(met_frame, "ΔP (paradigma)", self.m_dp, COLORES["acento3"]).grid(
+            row=0, column=1, sticky="ew", padx=3)
+        metric_card(met_frame, "ΔS·ΔP", self.m_prod, COLORES["acento4"]).grid(
+            row=0, column=2, sticky="ew", padx=(6,0))
+
+    def _get_estado(self):
+        dim  = int(self.var_dim.get())
+        pos  = int(min(self.var_pos.get(), dim - 1))
+        lang = Langue(dim)
+        principio = PrincipioIncertidumbreSaussure(lang)
+        tipo = self.var_tipo.get()
+        if tipo == "Sintagmático puro":
+            return principio.estado_sintagmatico_puro(pos), principio
+        elif tipo == "Paradigmático puro":
+            return principio.estado_paradigmatico_puro(pos), principio
+        elif tipo == "Mínima incertidumbre":
+            return principio.obs.estado_minima_incertidumbre(), principio
+        else:
+            return lang.superposicion([1] * dim), principio
+
+    def _analizar(self):
+        if not PAQUETE_OK:
+            return
+        estado, principio = self._get_estado()
+        analisis = principio.analizar_estado(estado)
+        dS   = analisis["delta_sintagma"]
+        dP   = analisis["delta_paradigma"]
+        prod = analisis["producto_incertidumbre"]
+        cota = analisis["cota_heisenberg"]
+
+        satisface = "✓ SÍ" if analisis["satisface_principio"] else "✗ NO"
+        txt = (
+            f"Estado:           {self.var_tipo.get()}\n"
+            f"Dimensión:        {int(self.var_dim.get())}\n\n"
+            f"ΔS (sintagma):    {dS:.6f}\n"
+            f"ΔP (paradigma):   {dP:.6f}\n"
+            f"ΔS · ΔP:          {prod:.6f}\n"
+            f"Cota ℏ/2:         {cota:.6f}\n"
+            f"Factor s/ cota:   {analisis['factor_sobre_cota']:.2f}x\n\n"
+            f"Satisface ΔS·ΔP ≥ ℏ/2:  {satisface}\n\n"
+            f"Interpretación:\n  {analisis['interpretacion']}\n\n"
+            f"Dominancia:\n  {analisis['dominancia']}\n"
+        )
+        escribir_salida(self.salida, txt)
+        self.m_ds.set(f"{dS:.3f}")
+        self.m_dp.set(f"{dP:.3f}")
+        self.m_prod.set(f"{prod:.3f}")
+
+    def _demostrar(self):
+        if not PAQUETE_OK:
+            return
+        dim = int(self.var_dim.get())
+        lang = Langue(dim)
+        principio = PrincipioIncertidumbreSaussure(lang)
+        demo = principio.demostrar_principio()
+
+        lineas = ["╔═══════════════════════════════════════╗",
+                  "║   DEMOSTRACIÓN DEL PRINCIPIO           ║",
+                  "║   ΔS · ΔP ≥ ℏ/2                       ║",
+                  "╚═══════════════════════════════════════╝\n"]
+        for nombre, datos in demo.items():
+            lineas.append(f"[ {nombre.upper()} ]")
+            lineas.append(f"  ΔS = {datos['delta_sintagma']:.4f}")
+            lineas.append(f"  ΔP = {datos['delta_paradigma']:.4f}")
+            lineas.append(f"  ΔS·ΔP = {datos['producto']:.4f}\n")
+
+        cota = HBAR_SEMIOTICO / 2
+        lineas.append(f"Cota mínima ℏ/2 = {cota:.4f}")
+        lineas.append("Cuando ΔS ↓  →  ΔP ↑  y viceversa.")
+        escribir_salida(self.salida, "\n".join(lineas))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  PANEL 3 — PRINCIPIO DE INCERTIDUMBRE (análisis detallado)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class PanelIncertidumbre(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, bg=COLORES["bg"])
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(3, weight=1)
+        self._build()
+
+    def _build(self):
+        cab = tk.Frame(self, bg=COLORES["bg"])
+        cab.grid(row=0, column=0, sticky="ew", padx=24, pady=(24,0))
+        label_titulo(cab, "△  Principio de incertidumbre", COLORES["acento3"]).pack(anchor="w")
+        label_sec(cab, "Análisis de incertidumbre y paradoja del observador").pack(anchor="w", pady=(2,0))
+
+        ctrl = seccion(self, "ESTADO PERSONALIZADO", COLORES["acento3"])
+        ctrl.grid(row=1, column=0, sticky="ew", padx=24, pady=12)
+
+        fila_sigs = tk.Frame(ctrl, bg=COLORES["panel"])
+        tk.Label(fila_sigs, text="Significantes", font=FUENTE_LABEL,
+                 bg=COLORES["panel"], fg=COLORES["texto_sec"],
+                 width=18, anchor="w").pack(side="left", padx=(10,0))
+        self.entry_sigs = tk.Entry(fila_sigs, font=FUENTE_LABEL,
+                                   bg=COLORES["entrada"], fg=COLORES["texto"],
+                                   insertbackground=COLORES["acento3"],
+                                   relief="flat", width=32)
+        self.entry_sigs.insert(0, "perro, gato, ratón, pájaro")
+        self.entry_sigs.pack(side="left", padx=8, pady=6)
+        fila_sigs.pack(fill="x", pady=4)
+
+        fila_amps = tk.Frame(ctrl, bg=COLORES["panel"])
+        tk.Label(fila_amps, text="Amplitudes", font=FUENTE_LABEL,
+                 bg=COLORES["panel"], fg=COLORES["texto_sec"],
+                 width=18, anchor="w").pack(side="left", padx=(10,0))
+        self.entry_amps = tk.Entry(fila_amps, font=FUENTE_LABEL,
+                                   bg=COLORES["entrada"], fg=COLORES["texto"],
+                                   insertbackground=COLORES["acento3"],
+                                   relief="flat", width=32)
+        self.entry_amps.insert(0, "1, 0.5, 0.3, 0.8")
+        self.entry_amps.pack(side="left", padx=8, pady=6)
+        fila_amps.pack(fill="x", pady=4)
+
+        btn_row = tk.Frame(self, bg=COLORES["bg"])
+        btn_row.grid(row=2, column=0, sticky="nw", padx=24, pady=(0,8))
+        boton(btn_row, "  Calcular incertidumbre  ", self._calcular,
+              COLORES["acento3"]).pack(side="left", padx=(0,8))
+        boton(btn_row, "  Paradoja del observador  ", self._paradoja,
+              COLORES["borde"]).pack(side="left")
+
+        sal = seccion(self, "RESULTADO", COLORES["acento3"])
+        sal.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0,8))
+        self.rowconfigure(3, weight=1)
+        self.salida = area_salida(sal, height=12)
+        self.salida.pack(fill="both", expand=True, padx=10, pady=10)
+
+        met_frame = tk.Frame(self, bg=COLORES["bg"])
+        met_frame.grid(row=4, column=0, sticky="ew", padx=24, pady=(0,20))
+        for i in range(3):
+            met_frame.columnconfigure(i, weight=1)
+        self.m_ds    = tk.StringVar(value="—")
+        self.m_dp    = tk.StringVar(value="—")
+        self.m_ok    = tk.StringVar(value="—")
+        metric_card(met_frame, "ΔS", self.m_ds, COLORES["acento3"]).grid(
+            row=0, column=0, sticky="ew", padx=(0,6))
+        metric_card(met_frame, "ΔP", self.m_dp, COLORES["acento3"]).grid(
+            row=0, column=1, sticky="ew", padx=3)
+        metric_card(met_frame, "Principio", self.m_ok, COLORES["acento2"]).grid(
+            row=0, column=2, sticky="ew", padx=(6,0))
+
+    def _parse_estado(self):
+        sigs_txt = self.entry_sigs.get()
+        amps_txt = self.entry_amps.get()
+        sigs = [s.strip() for s in sigs_txt.split(",")]
+        amps = [float(a.strip()) for a in amps_txt.split(",")]
+        if len(sigs) != len(amps):
+            raise ValueError(f"Cantidad distinta: {len(sigs)} significantes, {len(amps)} amplitudes")
+        return SignoCuanto(sigs, amps)
+
+    def _calcular(self):
+        if not PAQUETE_OK:
+            return
+        try:
+            estado = self._parse_estado()
+        except Exception as e:
+            escribir_salida(self.salida, f"Error de entrada: {e}\n")
+            return
+
+        from saussure_quantum.uncertainty import incertidumbre_saussure_heisenberg
+        res = incertidumbre_saussure_heisenberg(estado)
+        dS   = res["delta_sintagma"]
+        dP   = res["delta_paradigma"]
+        prod = res["producto_incertidumbre"]
+        cota = res["cota_heisenberg"]
+
+        probs = np.abs(estado.amplitudes) ** 2
+        barra_max = 20
+        barras = "\n".join(
+            f"  {s:<14} {'█' * int(p*barra_max):<20} {p*100:5.1f}%"
+            for s, p in zip(estado.significantes, probs)
+        )
+
+        txt = (
+            f"Signo analizado:\n{barras}\n\n"
+            f"{'─'*40}\n"
+            f"ΔS (incertidumbre sintagmática):  {dS:.6f}\n"
+            f"ΔP (incertidumbre paradigmática): {dP:.6f}\n"
+            f"ΔS · ΔP:                          {prod:.6f}\n"
+            f"Cota ℏ/2:                         {cota:.6f}\n"
+            f"Factor sobre cota:                {res['factor_sobre_cota']:.2f}x\n\n"
+            f"{'─'*40}\n"
+            f"{res['interpretacion']}\n"
+            f"{res['dominancia']}\n"
+        )
+        escribir_salida(self.salida, txt)
+        self.m_ds.set(f"{dS:.3f}")
+        self.m_dp.set(f"{dP:.3f}")
+        self.m_ok.set("✓" if res["satisface_principio"] else "✗")
+
+    def _paradoja(self):
+        if not PAQUETE_OK:
+            return
+        try:
+            estado = self._parse_estado()
+        except Exception as e:
+            escribir_salida(self.salida, f"Error de entrada: {e}\n")
+            return
+
+        from saussure_quantum.uncertainty import paradoja_del_observador_linguistico
+        res = paradoja_del_observador_linguistico(estado)
+        orig  = res["estado_original"]
+        post_s = res["despues_medir_sintagma"]
+        post_p = res["despues_medir_paradigma"]
+
+        txt = (
+            "╔══════════════════════════════════════╗\n"
+            "║   PARADOJA DEL OBSERVADOR             ║\n"
+            "╚══════════════════════════════════════╝\n\n"
+            f"Estado original:\n"
+            f"  ΔS = {orig['delta_S']:.4f}   ΔP = {orig['delta_P']:.4f}\n"
+            f"  ΔS·ΔP = {orig['producto']:.4f}\n\n"
+            f"Tras medir SINTAGMA:\n"
+            f"  ΔS = {post_s['delta_S']:.4f}   ΔP = {post_s['delta_P']:.4f}\n"
+            f"  ΔS·ΔP = {post_s['producto']:.4f}\n"
+            f"  Perturbación significativa: {'SÍ' if post_s['cambio_significativo'] else 'NO'}\n\n"
+            f"Tras medir PARADIGMA:\n"
+            f"  ΔS = {post_p['delta_S']:.4f}   ΔP = {post_p['delta_P']:.4f}\n"
+            f"  ΔS·ΔP = {post_p['producto']:.4f}\n"
+            f"  Perturbación significativa: {'SÍ' if post_p['cambio_significativo'] else 'NO'}\n\n"
+            "Medir un eje perturba el otro. No hay\n"
+            "observación sin perturbación.\n"
+        )
+        escribir_salida(self.salida, txt)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  PANEL 4 — OPERADOR DIFERENCIA
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class PanelDiferencia(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, bg=COLORES["bg"])
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(3, weight=1)
+        self._build()
+
+    def _build(self):
+        cab = tk.Frame(self, bg=COLORES["bg"])
+        cab.grid(row=0, column=0, sticky="ew", padx=24, pady=(24,0))
+        label_titulo(cab, "⊗  Operador diferencia D̂", COLORES["acento4"]).pack(anchor="w")
+        label_sec(cab, "Materializa el principio saussureano: ser por no ser").pack(anchor="w", pady=(2,0))
+
+        ctrl = seccion(self, "SISTEMA DE SIGNOS", COLORES["acento4"])
+        ctrl.grid(row=1, column=0, sticky="ew", padx=24, pady=12)
+
+        fila_sigs = tk.Frame(ctrl, bg=COLORES["panel"])
+        tk.Label(fila_sigs, text="Signos (uno x línea)", font=FUENTE_LABEL,
+                 bg=COLORES["panel"], fg=COLORES["texto_sec"],
+                 width=20, anchor="w").pack(side="left", padx=(10,0))
+        self.entry_sigs = tk.Text(fila_sigs, font=FUENTE_LABEL,
+                                   bg=COLORES["entrada"], fg=COLORES["texto"],
+                                   insertbackground=COLORES["acento4"],
+                                   relief="flat", width=30, height=4)
+        self.entry_sigs.insert("1.0", "/p/\n/b/\n/t/")
+        self.entry_sigs.pack(side="left", padx=8, pady=6)
+        fila_sigs.pack(fill="x", pady=4)
+
+        btn_row = tk.Frame(self, bg=COLORES["bg"])
+        btn_row.grid(row=2, column=0, sticky="nw", padx=24, pady=(0,8))
+        boton(btn_row, "  Aplicar D̂  ", self._aplicar,
+              COLORES["acento4"]).pack(side="left", padx=(0,8))
+        boton(btn_row, "  Análisis de negatividad  ", self._negatividad,
+              COLORES["borde"]).pack(side="left", padx=(0,8))
+        boton(btn_row, "  Similitud diferencial  ", self._similitud,
+              COLORES["borde"]).pack(side="left")
+
+        sal = seccion(self, "RESULTADO", COLORES["acento4"])
+        sal.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0,8))
+        self.rowconfigure(3, weight=1)
+        self.salida = area_salida(sal, height=12)
+        self.salida.pack(fill="both", expand=True, padx=10, pady=10)
+
+        met_frame = tk.Frame(self, bg=COLORES["bg"])
+        met_frame.grid(row=4, column=0, sticky="ew", padx=24, pady=(0,20))
+        for i in range(3):
+            met_frame.columnconfigure(i, weight=1)
+        self.m_dim  = tk.StringVar(value="—")
+        self.m_neg  = tk.StringVar(value="—")
+        self.m_dom  = tk.StringVar(value="—")
+        metric_card(met_frame, "Dimensión", self.m_dim, COLORES["acento4"]).grid(
+            row=0, column=0, sticky="ew", padx=(0,6))
+        metric_card(met_frame, "Negatividad total", self.m_neg, COLORES["acento4"]).grid(
+            row=0, column=1, sticky="ew", padx=3)
+        metric_card(met_frame, "Signo dominante", self.m_dom, COLORES["acento"]).grid(
+            row=0, column=2, sticky="ew", padx=(6,0))
+
+    def _get_signos(self):
+        txt = self.entry_sigs.get("1.0", "end").strip()
+        sigs = [s.strip() for s in txt.splitlines() if s.strip()]
+        if len(sigs) < 2:
+            raise ValueError("Ingresá al menos 2 signos")
+        estados = []
+        for i, s in enumerate(sigs):
+            amps = [0.0] * len(sigs)
+            amps[i] = 1.0
+            estados.append(SignoCuanto(sigs, amps))
+        return sigs, estados
+
+    def _aplicar(self):
+        if not PAQUETE_OK:
+            return
+        try:
+            sigs, estados = self._get_signos()
+        except Exception as e:
+            escribir_salida(self.salida, f"Error: {e}\n")
+            return
+
+        resultado = operador_diferencia(estados)
+        probs = np.abs(resultado.amplitudes) ** 2
+        barra_max = 20
+
+        lineas = [
+            "D̂ aplicado al sistema de signos\n",
+            f"{'─'*42}\n",
+            "Estado resultante (pura diferencia):\n",
+        ]
+        for s, p, a in zip(sigs, probs, resultado.amplitudes):
+            barra = "█" * int(p * barra_max)
+            lineas.append(f"  {s:<12} {barra:<20} {p*100:5.1f}%  amp={a.real:+.3f}")
+
+        lineas.append(f"\n{'─'*42}")
+        lineas.append(f"Norma: {np.linalg.norm(resultado.amplitudes):.6f}")
+        lineas.append("\nCada signo ES por NO SER los demás.")
+        lineas.append("La 'sustancia' se disuelve en relaciones puras.")
+
+        escribir_salida(self.salida, "\n".join(lineas))
+        self.m_dim.set(str(len(sigs)))
+        neg = principio_negatividad(resultado)
+        self.m_neg.set(f"{neg['negatividad_total']:.2f}")
+        self.m_dom.set(neg["significante_principal"])
+
+    def _negatividad(self):
+        if not PAQUETE_OK:
+            return
+        try:
+            sigs, estados = self._get_signos()
+        except Exception as e:
+            escribir_salida(self.salida, f"Error: {e}\n")
+            return
+
+        resultado = operador_diferencia(estados)
+        neg = principio_negatividad(resultado)
+        barra_max = 20
+
+        lineas = [
+            "ANÁLISIS DE NEGATIVIDAD\n",
+            "Cuánto 'debe' cada signo a no ser los otros:\n",
+            f"{'─'*42}\n",
+        ]
+        for s, n in neg["negatividad_por_significante"].items():
+            barra = "█" * int(n / max(neg["negatividad_por_significante"].values()) * barra_max)
+            lineas.append(f"  {s:<12} {barra:<22} {n:.4f}")
+
+        lineas.append(f"\n{'─'*42}")
+        lineas.append(f"Negatividad total:   {neg['negatividad_total']:.4f}")
+        lineas.append(f"Signo principal:     {neg['significante_principal']}")
+        escribir_salida(self.salida, "\n".join(lineas))
+        self.m_neg.set(f"{neg['negatividad_total']:.2f}")
+        self.m_dom.set(neg["significante_principal"])
+
+    def _similitud(self):
+        if not PAQUETE_OK:
+            return
+        try:
+            sigs, estados = self._get_signos()
+        except Exception as e:
+            escribir_salida(self.salida, f"Error: {e}\n")
+            return
+
+        from saussure_quantum.operators import similitud_diferencial
+        lineas = ["SIMILITUD DIFERENCIAL\n",
+                  "Qué tan similares son los signos entre sí:\n",
+                  f"{'─'*42}\n"]
+        for i in range(len(estados)):
+            for j in range(i+1, len(estados)):
+                sim = similitud_diferencial(estados[i], estados[j])
+                barra = "█" * int(sim * 20)
+                lineas.append(f"  {sigs[i]:<8} ↔ {sigs[j]:<8}  {barra:<22} {sim:.4f}")
+
+        lineas.append(f"\n{'─'*42}")
+        lineas.append("1.0 = idénticos en diferencia")
+        lineas.append("0.0 = ortogonales, sin relación")
+        escribir_salida(self.salida, "\n".join(lineas))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  ENTRY POINT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+if __name__ == "__main__":
+    app = AppSaussureQuantum()
+    app.mainloop()
