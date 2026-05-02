@@ -66,10 +66,18 @@ class AppSaussureQuantum(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Saussure–Quantum Fusion  v0.1.0")
-        self.geometry("1050x700")
         self.minsize(900, 600)
         self.configure(bg=COLORES["bg"])
         self.resizable(True, True)
+
+        # Centrar en pantalla antes de mostrar
+        ancho, alto = 1050, 700
+        self.update_idletasks()
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        x = (sw - ancho) // 2
+        y = (sh - alto) // 2
+        self.geometry(f"{ancho}x{alto}+{x}+{y}")
 
         self._build_layout()
         self._mostrar_panel("poeta")
@@ -184,6 +192,170 @@ class AppSaussureQuantum(tk.Tk):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  SISTEMA DE TOOLTIPS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class Tooltip:
+    """
+    Tooltip que aparece al pasar el mouse sobre un widget.
+    Se destruye automáticamente al salir.
+    """
+    def __init__(self, widget, texto, delay=500):
+        self.widget  = widget
+        self.texto   = texto
+        self.delay   = delay
+        self._id     = None
+        self._ventana = None
+        widget.bind("<Enter>",  self._on_enter)
+        widget.bind("<Leave>",  self._on_leave)
+        widget.bind("<Button>", self._on_leave)
+
+    def _on_enter(self, event=None):
+        self._id = self.widget.after(self.delay, self._mostrar)
+
+    def _on_leave(self, event=None):
+        if self._id:
+            self.widget.after_cancel(self._id)
+            self._id = None
+        if self._ventana:
+            self._ventana.destroy()
+            self._ventana = None
+
+    def _mostrar(self):
+        if self._ventana:
+            return
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 4
+        self._ventana = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        tw.configure(bg=COLORES["borde"])
+        # Borde exterior
+        marco = tk.Frame(tw, bg=COLORES["borde"], padx=1, pady=1)
+        marco.pack()
+        tk.Label(
+            marco, text=self.texto, font=FUENTE_SMALL,
+            bg=COLORES["panel"], fg=COLORES["texto"],
+            justify="left", wraplength=340, padx=10, pady=8
+        ).pack()
+
+
+# Textos de ayuda por sección y control
+AYUDAS = {
+    # ── Poeta cuántico ────────────────────────────────────────────────────────
+    "poeta_panel": (
+        "El Poeta cuántico genera versos usando colapsos probabilísticos.\n"
+        "Cada palabra comienza en superposición de significados posibles\n"
+        "y 'colapsa' al ser pronunciada, igual que un estado cuántico\n"
+        "colapsa al ser medido. El resultado es poesía no determinista."
+    ),
+    "poeta_versos": (
+        "Cantidad de versos del poema.\n"
+        "Cada verso usa una estructura gramatical aleatoria\n"
+        "(sustantivo-verbo-adjetivo, etc.)."
+    ),
+    "poeta_temp": (
+        "Temperatura semántica (análoga a la temperatura en física estadística).\n"
+        "Baja (1.0): el sistema colapsa hacia las palabras más probables → versos más predecibles.\n"
+        "Alta (3.0): distribuye la probabilidad más uniformemente → versos más sorprendentes."
+    ),
+    "poeta_modo": (
+        "Normal: temperatura tal como se configura.\n"
+        "Caótico: temperatura multiplicada × 2.5 → máxima aleatoriedad.\n"
+        "Mínima incertidumbre: temperatura fija 0.3 → versos más coherentes y repetitivos."
+    ),
+    # ── Simulador ─────────────────────────────────────────────────────────────
+    "sim_panel": (
+        "El Simulador demuestra el Principio de Incertidumbre Saussure-Heisenberg:\n\n"
+        "  ΔS · ΔP ≥ ℏ/2\n\n"
+        "ΔS = incertidumbre sintagmática (¿dónde aparece el signo en la frase?)\n"
+        "ΔP = incertidumbre paradigmática (¿con qué otras palabras puede sustituirse?)\n\n"
+        "Cuanto más precisa es la posición de una palabra en la cadena hablada,\n"
+        "menos se sabe qué otras palabras podrían reemplazarla, y viceversa.\n"
+        "Es el análogo lingüístico de posición-momento en mecánica cuántica."
+    ),
+    "sim_tipo": (
+        "Sintagmático puro: posición exacta en la frase → ΔS=0, ΔP muy grande.\n"
+        "Paradigmático puro: sustitución exacta definida → ΔP pequeño, ΔS grande.\n"
+        "Mínima incertidumbre: compromiso óptimo entre ambos ejes (estado coherente).\n"
+        "Superposición uniforme: máxima ignorancia sobre ambos ejes."
+    ),
+    "sim_dim": (
+        "Dimensión del espacio lingüístico (cantidad de términos en el sistema).\n"
+        "Más dimensión = sistema más complejo = incertidumbres más grandes."
+    ),
+    "sim_pos": (
+        "Para estado sintagmático: índice de la posición en la frase (0 = primera).\n"
+        "Para estado paradigmático: índice del modo de sustitución."
+    ),
+    # ── Incertidumbre ─────────────────────────────────────────────────────────
+    "inc_panel": (
+        "Analizá el principio de incertidumbre sobre tu propio conjunto de signos.\n\n"
+        "Ingresá los significantes (palabras, fonemas, conceptos) separados por coma\n"
+        "y sus amplitudes (números que representan el 'peso' de cada uno).\n"
+        "Las amplitudes se normalizan automáticamente.\n\n"
+        "Ejemplos de uso:\n"
+        "  • Fonemas:   /p/, /b/, /t/  →  amplitudes: 1, 0.5, 0.3\n"
+        "  • Animales:  perro, gato, pez  →  amplitudes: 1, 1, 1\n"
+        "  • Conceptos: verdad, mentira, duda  →  amplitudes: 2, 1, 0.5"
+    ),
+    "inc_sigs": (
+        "Lista de significantes separados por coma.\n"
+        "Pueden ser palabras, fonemas, símbolos o cualquier unidad lingüística.\n"
+        "Ejemplos: 'sol, luna, estrella'  |  '/p/, /b/, /t/'  |  'amor, odio, indiferencia'"
+    ),
+    "inc_amps": (
+        "Amplitudes de probabilidad para cada significante (en el mismo orden).\n"
+        "No necesitan sumar 1 — se normalizan automáticamente.\n"
+        "Mayor amplitud = mayor probabilidad de colapso a ese significante.\n"
+        "Ejemplo: '1, 0.5, 0.3' hace que el primero sea el más probable."
+    ),
+    "inc_paradoja": (
+        "La paradoja del observador muestra que medir un eje perturba el otro.\n"
+        "Medir el sintagma (posición) aumenta la incertidumbre paradigmática,\n"
+        "y medir el paradigma (sustitución) aumenta la sintagmática.\n"
+        "No hay observación sin perturbación — igual que en mecánica cuántica."
+    ),
+    # ── Operador diferencia ───────────────────────────────────────────────────
+    "op_panel": (
+        "El Operador Diferencia D̂ materializa el principio central de Saussure:\n\n"
+        "  'En la lengua solo hay diferencias sin términos positivos'\n\n"
+        "Un signo no tiene significado por sí mismo, sino por oponerse a todos\n"
+        "los demás signos del sistema. /p/ ES porque NO ES /b/ ni /t/.\n\n"
+        "D̂ transforma estados 'sustanciales' (un signo aislado) en estados\n"
+        "'diferenciales' (un signo como red de oposiciones).\n\n"
+        "Ingresá los signos del sistema, uno por línea."
+    ),
+    "op_signos": (
+        "Ingresá los signos del sistema lingüístico, uno por línea.\n"
+        "El operador diferencia los tomará como un sistema de oposiciones.\n\n"
+        "Ejemplos:\n"
+        "  Fonemas:   /p/  /b/  /t/\n"
+        "  Colores:   rojo  verde  azul  amarillo\n"
+        "  Conceptos: vida  muerte  sueño  realidad\n"
+        "  Animales:  perro  gato  ratón"
+    ),
+    "op_negatividad": (
+        "El análisis de negatividad muestra cuánto 'debe' cada signo a no ser los otros.\n"
+        "Un signo con alta negatividad es muy dependiente del contraste con el resto.\n"
+        "Esto es la fuerza diferencial de Saussure cuantificada."
+    ),
+    "op_similitud": (
+        "La similitud diferencial mide qué tan parecidos son dos signos\n"
+        "en términos de sus diferencias con los demás, no de su 'sustancia'.\n"
+        "1.0 = idénticos en su red de oposiciones.\n"
+        "0.0 = completamente ortogonales en el sistema."
+    ),
+}
+
+
+def agregar_tooltip(widget, clave):
+    """Agrega un tooltip a un widget usando la clave en AYUDAS."""
+    if clave in AYUDAS:
+        Tooltip(widget, AYUDAS[clave])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  WIDGETS REUTILIZABLES
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -285,8 +457,12 @@ class PanelPoeta(tk.Frame):
         # Cabecera
         cab = tk.Frame(self, bg=COLORES["bg"])
         cab.grid(row=0, column=0, sticky="ew", padx=24, pady=(24,0))
-        label_titulo(cab, "◈  Poeta cuántico", COLORES["acento"]).pack(anchor="w")
-        label_sec(cab, "Genera versos por colapso de superposiciones semánticas").pack(anchor="w", pady=(2,0))
+        tit = label_titulo(cab, "◈  Poeta cuántico", COLORES["acento"])
+        tit.pack(anchor="w")
+        agregar_tooltip(tit, "poeta_panel")
+        desc = label_sec(cab, "Genera versos por colapso de superposiciones semánticas  (?)")
+        desc.pack(anchor="w", pady=(2,0))
+        agregar_tooltip(desc, "poeta_panel")
 
         # Controles
         ctrl = seccion(self, "PARÁMETROS", COLORES["acento"])
@@ -294,9 +470,11 @@ class PanelPoeta(tk.Frame):
 
         fila1, self.var_versos = slider_con_label(ctrl, "Versos", 1, 8, 4)
         fila1.pack(fill="x", pady=4)
+        agregar_tooltip(fila1, "poeta_versos")
         fila2, self.var_temp = slider_con_label(ctrl, "Temperatura ℏ", 1, 30, 10,
                                                  fmt="{:.1f}")
         fila2.pack(fill="x", pady=4)
+        agregar_tooltip(fila2, "poeta_temp")
 
         fila_modo = tk.Frame(ctrl, bg=COLORES["panel"])
         tk.Label(fila_modo, text="Modo", font=FUENTE_LABEL, bg=COLORES["panel"],
@@ -306,26 +484,52 @@ class PanelPoeta(tk.Frame):
                              values=["Normal", "Caótico", "Mínima incertidumbre"],
                              state="readonly", font=FUENTE_LABEL, width=22)
         combo.pack(side="left", padx=8, pady=6)
+        agregar_tooltip(fila_modo, "poeta_modo")
         fila_modo.pack(fill="x", pady=4)
+
+        # Diccionario personalizable
+        dic_sec = seccion(self, "DICCIONARIO  (palabras separadas por coma)", COLORES["acento"])
+        dic_sec.grid(row=2, column=0, sticky="ew", padx=24, pady=(0,4))
+
+        DEFAULTS = {
+            "Sustantivos": "amor, caos, luz, sombra, infinito, vacío, tiempo, silencio",
+            "Verbos":      "nace, muere, sueña, vuela, cae, asciende, persiste, colapsa",
+            "Adjetivos":   "eterno, fugaz, profundo, ligero, oscuro, brillante, quantum, discreto",
+            "Conectores":  "y, pero, cuando, donde, como, mientras, porque, aunque",
+        }
+        self.dic_entries = {}
+        for cat, default in DEFAULTS.items():
+            fila = tk.Frame(dic_sec, bg=COLORES["panel"])
+            tk.Label(fila, text=cat, font=FUENTE_LABEL, bg=COLORES["panel"],
+                     fg=COLORES["texto_sec"], width=12, anchor="w").pack(side="left", padx=(10,0))
+            entry = tk.Entry(fila, font=FUENTE_LABEL, bg=COLORES["entrada"],
+                             fg=COLORES["texto"], insertbackground=COLORES["acento"],
+                             relief="flat")
+            entry.insert(0, default)
+            entry.pack(side="left", fill="x", expand=True, padx=8, pady=4)
+            fila.pack(fill="x", pady=2)
+            self.dic_entries[cat.lower()] = entry
 
         # Botones
         btn_row = tk.Frame(self, bg=COLORES["bg"])
-        btn_row.grid(row=2, column=0, sticky="nw", padx=24, pady=(0,8))
+        btn_row.grid(row=3, column=0, sticky="nw", padx=24, pady=(4,8))
         boton(btn_row, "  Generar poema  ", self._generar,
               COLORES["acento"]).pack(side="left", padx=(0,8))
+        boton(btn_row, "  Restaurar diccionario  ", self._restaurar_dic,
+              COLORES["borde"]).pack(side="left", padx=(0,8))
         boton(btn_row, "  Limpiar  ", self._limpiar,
               COLORES["borde"]).pack(side="left")
 
         # Salida
         sal = seccion(self, "POEMA GENERADO", COLORES["acento"])
-        sal.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0,8))
-        self.rowconfigure(3, weight=1)
-        self.salida = area_salida(sal, height=10)
+        sal.grid(row=4, column=0, sticky="nsew", padx=24, pady=(0,8))
+        self.rowconfigure(4, weight=1)
+        self.salida = area_salida(sal, height=7)
         self.salida.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Métricas
         met_frame = tk.Frame(self, bg=COLORES["bg"])
-        met_frame.grid(row=4, column=0, sticky="ew", padx=24, pady=(0,20))
+        met_frame.grid(row=5, column=0, sticky="ew", padx=24, pady=(0,20))
         for i in range(3):
             met_frame.columnconfigure(i, weight=1)
         self.m_palabras = tk.StringVar(value="—")
@@ -338,14 +542,43 @@ class PanelPoeta(tk.Frame):
         metric_card(met_frame, "Entropía media", self.m_entropia, COLORES["acento3"]).grid(
             row=0, column=2, sticky="ew", padx=(6,0))
 
+    def _parse_dic(self):
+        """Leer el diccionario personalizado desde los campos de texto."""
+        dic = {}
+        for cat, entry in self.dic_entries.items():
+            palabras = [p.strip() for p in entry.get().split(",") if p.strip()]
+            if len(palabras) < 2:
+                raise ValueError(f"'{cat}' necesita al menos 2 palabras")
+            amps = [1.0] * len(palabras)
+            dic[cat] = SignoCuanto(palabras, amps)
+        return dic
+
+    def _restaurar_dic(self):
+        """Restaurar el diccionario a los valores por defecto."""
+        defaults = {
+            "sustantivos": "amor, caos, luz, sombra, infinito, vacío, tiempo, silencio",
+            "verbos":      "nace, muere, sueña, vuela, cae, asciende, persiste, colapsa",
+            "adjetivos":   "eterno, fugaz, profundo, ligero, oscuro, brillante, quantum, discreto",
+            "conectores":  "y, pero, cuando, donde, como, mientras, porque, aunque",
+        }
+        for cat, entry in self.dic_entries.items():
+            entry.delete(0, "end")
+            entry.insert(0, defaults[cat])
+
     def _generar(self):
         if not PAQUETE_OK:
             escribir_salida(self.salida, "⚠  Error: paquete no disponible.\n")
             return
 
-        n_versos  = int(self.var_versos.get())
-        temp_raw  = self.var_temp.get() / 10.0
-        modo      = self.var_modo.get()
+        try:
+            diccionario = self._parse_dic()
+        except ValueError as e:
+            escribir_salida(self.salida, f"⚠  Error en diccionario: {e}\n")
+            return
+
+        n_versos = int(self.var_versos.get())
+        temp_raw = self.var_temp.get() / 10.0
+        modo     = self.var_modo.get()
 
         if modo == "Caótico":
             humor = temp_raw * 2.5
@@ -354,33 +587,15 @@ class PanelPoeta(tk.Frame):
         else:
             humor = temp_raw
 
-        diccionario = {
-            "sustantivos": SignoCuanto(
-                ["amor", "caos", "luz", "sombra", "infinito", "vacío", "tiempo", "silencio"],
-                [1, 1.2, 0.8, 0.9, 1.1, 0.7, 1.0, 0.85]
-            ),
-            "verbos": SignoCuanto(
-                ["nace", "muere", "sueña", "vuela", "cae", "asciende", "persiste", "colapsa"],
-                [1, 0.9, 1.3, 0.8, 0.6, 1.1, 0.75, 1.2]
-            ),
-            "adjetivos": SignoCuanto(
-                ["eterno", "fugaz", "profundo", "ligero", "oscuro", "brillante", "quantum", "discreto"],
-                [1.2, 0.8, 0.7, 1.1, 0.9, 1.3, 1.0, 0.6]
-            ),
-            "conectores": SignoCuanto(
-                ["y", "o", "pero", "cuando", "donde", "como", "mientras", "porque"],
-                [1.5, 0.5, 0.8, 1.2, 0.6, 0.9, 0.7, 0.4]
-            ),
-        }
-
+        cats = list(diccionario.keys())
         estructuras = [
-            ["sustantivos", "verbos", "adjetivos"],
-            ["adjetivos", "sustantivos", "verbos"],
-            ["verbos", "sustantivos"],
-            ["conectores", "adjetivos", "sustantivos", "verbos"],
+            [cats[0], cats[1], cats[2]] if len(cats) >= 3 else cats,
+            [cats[2], cats[0], cats[1]] if len(cats) >= 3 else cats,
+            [cats[1], cats[0]]          if len(cats) >= 2 else cats,
+            [cats[3], cats[2], cats[0], cats[1]] if len(cats) >= 4 else cats,
         ]
 
-        ctx = ContextoEnunciativo(temperatura_semantica=humor)
+        import copy
         versos = []
         total_entropia = []
         colapsos = 0
@@ -391,7 +606,6 @@ class PanelPoeta(tk.Frame):
             estructura = random.choice(estructuras)
             palabras = []
             for cat in estructura:
-                import copy
                 signo = copy.deepcopy(diccionario[cat])
                 probs = np.abs(signo.amplitudes) ** 2
                 ent = -np.sum(probs * np.log(probs + 1e-10))
@@ -433,8 +647,12 @@ class PanelSimulador(tk.Frame):
     def _build(self):
         cab = tk.Frame(self, bg=COLORES["bg"])
         cab.grid(row=0, column=0, sticky="ew", padx=24, pady=(24,0))
-        label_titulo(cab, "◉  Simulador de incertidumbre", COLORES["acento2"]).pack(anchor="w")
-        label_sec(cab, "Explora el principio ΔS·ΔP ≥ ℏ/2 en estados lingüísticos").pack(anchor="w", pady=(2,0))
+        tit = label_titulo(cab, "◉  Simulador de incertidumbre", COLORES["acento2"])
+        tit.pack(anchor="w")
+        agregar_tooltip(tit, "sim_panel")
+        desc = label_sec(cab, "Explora el principio ΔS·ΔP ≥ ℏ/2 en estados lingüísticos  (?)")
+        desc.pack(anchor="w", pady=(2,0))
+        agregar_tooltip(desc, "sim_panel")
 
         ctrl = seccion(self, "CONFIGURACIÓN", COLORES["acento2"])
         ctrl.grid(row=1, column=0, sticky="ew", padx=24, pady=12)
@@ -449,12 +667,15 @@ class PanelSimulador(tk.Frame):
                                      "Mínima incertidumbre", "Superposición uniforme"],
                              state="readonly", font=FUENTE_LABEL, width=26)
         combo.pack(side="left", padx=8, pady=6)
+        agregar_tooltip(fila_tipo, "sim_tipo")
         fila_tipo.pack(fill="x", pady=4)
 
         fila_dim, self.var_dim = slider_con_label(ctrl, "Dimensión", 4, 32, 20)
         fila_dim.pack(fill="x", pady=4)
+        agregar_tooltip(fila_dim, "sim_dim")
         fila_pos, self.var_pos = slider_con_label(ctrl, "Posición / Modo", 0, 19, 5)
         fila_pos.pack(fill="x", pady=4)
+        agregar_tooltip(fila_pos, "sim_pos")
 
         btn_row = tk.Frame(self, bg=COLORES["bg"])
         btn_row.grid(row=2, column=0, sticky="nw", padx=24, pady=(0,8))
@@ -564,42 +785,77 @@ class PanelIncertidumbre(tk.Frame):
     def _build(self):
         cab = tk.Frame(self, bg=COLORES["bg"])
         cab.grid(row=0, column=0, sticky="ew", padx=24, pady=(24,0))
-        label_titulo(cab, "△  Principio de incertidumbre", COLORES["acento3"]).pack(anchor="w")
-        label_sec(cab, "Análisis de incertidumbre y paradoja del observador").pack(anchor="w", pady=(2,0))
+        tit = label_titulo(cab, "△  Principio de incertidumbre", COLORES["acento3"])
+        tit.pack(anchor="w")
+        agregar_tooltip(tit, "inc_panel")
+        desc = label_sec(cab, "Análisis de incertidumbre y paradoja del observador  (?)")
+        desc.pack(anchor="w", pady=(2,0))
+        agregar_tooltip(desc, "inc_panel")
 
         ctrl = seccion(self, "ESTADO PERSONALIZADO", COLORES["acento3"])
         ctrl.grid(row=1, column=0, sticky="ew", padx=24, pady=12)
 
         fila_sigs = tk.Frame(ctrl, bg=COLORES["panel"])
-        tk.Label(fila_sigs, text="Significantes", font=FUENTE_LABEL,
+        lbl_sigs = tk.Label(fila_sigs, text="Significantes  (?)", font=FUENTE_LABEL,
                  bg=COLORES["panel"], fg=COLORES["texto_sec"],
-                 width=18, anchor="w").pack(side="left", padx=(10,0))
+                 width=18, anchor="w")
+        lbl_sigs.pack(side="left", padx=(10,0))
+        agregar_tooltip(lbl_sigs, "inc_sigs")
         self.entry_sigs = tk.Entry(fila_sigs, font=FUENTE_LABEL,
                                    bg=COLORES["entrada"], fg=COLORES["texto"],
                                    insertbackground=COLORES["acento3"],
                                    relief="flat", width=32)
         self.entry_sigs.insert(0, "perro, gato, ratón, pájaro")
         self.entry_sigs.pack(side="left", padx=8, pady=6)
+        agregar_tooltip(self.entry_sigs, "inc_sigs")
         fila_sigs.pack(fill="x", pady=4)
 
         fila_amps = tk.Frame(ctrl, bg=COLORES["panel"])
-        tk.Label(fila_amps, text="Amplitudes", font=FUENTE_LABEL,
+        lbl_amps = tk.Label(fila_amps, text="Amplitudes  (?)", font=FUENTE_LABEL,
                  bg=COLORES["panel"], fg=COLORES["texto_sec"],
-                 width=18, anchor="w").pack(side="left", padx=(10,0))
+                 width=18, anchor="w")
+        lbl_amps.pack(side="left", padx=(10,0))
+        agregar_tooltip(lbl_amps, "inc_amps")
         self.entry_amps = tk.Entry(fila_amps, font=FUENTE_LABEL,
                                    bg=COLORES["entrada"], fg=COLORES["texto"],
                                    insertbackground=COLORES["acento3"],
                                    relief="flat", width=32)
         self.entry_amps.insert(0, "1, 0.5, 0.3, 0.8")
         self.entry_amps.pack(side="left", padx=8, pady=6)
+        agregar_tooltip(self.entry_amps, "inc_amps")
         fila_amps.pack(fill="x", pady=4)
+
+        # Ejemplos predefinidos
+        fila_ej = tk.Frame(ctrl, bg=COLORES["panel"])
+        tk.Label(fila_ej, text="Cargar ejemplo", font=FUENTE_LABEL,
+                 bg=COLORES["panel"], fg=COLORES["texto_sec"],
+                 width=18, anchor="w").pack(side="left", padx=(10,0))
+        self.var_ejemplo = tk.StringVar(value="— elegir —")
+        ejemplos = [
+            "— elegir —",
+            "Fonemas: /p/ /b/ /t/",
+            "Animales: perro gato ratón",
+            "Colores: rojo verde azul amarillo",
+            "Filosofía: verdad mentira duda certeza",
+            "Tiempo: pasado presente futuro",
+            "Emociones: amor odio miedo alegría tristeza",
+            "Planetas: Mercurio Venus Tierra Marte Júpiter",
+        ]
+        combo_ej = ttk.Combobox(fila_ej, textvariable=self.var_ejemplo,
+                                values=ejemplos, state="readonly",
+                                font=FUENTE_LABEL, width=30)
+        combo_ej.pack(side="left", padx=8, pady=6)
+        combo_ej.bind("<<ComboboxSelected>>", self._cargar_ejemplo)
+        fila_ej.pack(fill="x", pady=4)
 
         btn_row = tk.Frame(self, bg=COLORES["bg"])
         btn_row.grid(row=2, column=0, sticky="nw", padx=24, pady=(0,8))
         boton(btn_row, "  Calcular incertidumbre  ", self._calcular,
               COLORES["acento3"]).pack(side="left", padx=(0,8))
-        boton(btn_row, "  Paradoja del observador  ", self._paradoja,
-              COLORES["borde"]).pack(side="left")
+        btn_p = boton(btn_row, "  Paradoja del observador  ", self._paradoja,
+              COLORES["borde"])
+        btn_p.pack(side="left")
+        agregar_tooltip(btn_p, "inc_paradoja")
 
         sal = seccion(self, "RESULTADO", COLORES["acento3"])
         sal.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0,8))
@@ -620,6 +876,28 @@ class PanelIncertidumbre(tk.Frame):
             row=0, column=1, sticky="ew", padx=3)
         metric_card(met_frame, "Principio", self.m_ok, COLORES["acento2"]).grid(
             row=0, column=2, sticky="ew", padx=(6,0))
+
+    def _cargar_ejemplo(self, event=None):
+        """Carga un ejemplo predefinido en los campos de significantes y amplitudes."""
+        EJEMPLOS = {
+            "Fonemas: /p/ /b/ /t/":              ("/p/, /b/, /t/",              "1, 0.8, 0.6"),
+            "Animales: perro gato ratón":         ("perro, gato, ratón",         "1, 0.7, 0.4"),
+            "Colores: rojo verde azul amarillo":  ("rojo, verde, azul, amarillo","1, 1, 1, 1"),
+            "Filosofía: verdad mentira duda certeza": (
+                "verdad, mentira, duda, certeza", "1.5, 0.8, 0.5, 1.2"),
+            "Tiempo: pasado presente futuro":     ("pasado, presente, futuro",   "0.6, 1.5, 0.9"),
+            "Emociones: amor odio miedo alegría tristeza": (
+                "amor, odio, miedo, alegría, tristeza", "1.2, 0.7, 0.5, 1.0, 0.6"),
+            "Planetas: Mercurio Venus Tierra Marte Júpiter": (
+                "Mercurio, Venus, Tierra, Marte, Júpiter", "0.4, 0.7, 1.5, 0.9, 1.1"),
+        }
+        seleccion = self.var_ejemplo.get()
+        if seleccion in EJEMPLOS:
+            sigs, amps = EJEMPLOS[seleccion]
+            self.entry_sigs.delete(0, "end")
+            self.entry_sigs.insert(0, sigs)
+            self.entry_amps.delete(0, "end")
+            self.entry_amps.insert(0, amps)
 
     def _parse_estado(self):
         sigs_txt = self.entry_sigs.get()
@@ -720,32 +998,43 @@ class PanelDiferencia(tk.Frame):
     def _build(self):
         cab = tk.Frame(self, bg=COLORES["bg"])
         cab.grid(row=0, column=0, sticky="ew", padx=24, pady=(24,0))
-        label_titulo(cab, "⊗  Operador diferencia D̂", COLORES["acento4"]).pack(anchor="w")
-        label_sec(cab, "Materializa el principio saussureano: ser por no ser").pack(anchor="w", pady=(2,0))
+        tit = label_titulo(cab, "⊗  Operador diferencia D̂", COLORES["acento4"])
+        tit.pack(anchor="w")
+        agregar_tooltip(tit, "op_panel")
+        desc = label_sec(cab, "Materializa el principio saussureano: ser por no ser  (?)")
+        desc.pack(anchor="w", pady=(2,0))
+        agregar_tooltip(desc, "op_panel")
 
         ctrl = seccion(self, "SISTEMA DE SIGNOS", COLORES["acento4"])
         ctrl.grid(row=1, column=0, sticky="ew", padx=24, pady=12)
 
         fila_sigs = tk.Frame(ctrl, bg=COLORES["panel"])
-        tk.Label(fila_sigs, text="Signos (uno x línea)", font=FUENTE_LABEL,
+        lbl_op = tk.Label(fila_sigs, text="Signos (uno x línea)  (?)", font=FUENTE_LABEL,
                  bg=COLORES["panel"], fg=COLORES["texto_sec"],
-                 width=20, anchor="w").pack(side="left", padx=(10,0))
+                 width=22, anchor="w")
+        lbl_op.pack(side="left", padx=(10,0))
+        agregar_tooltip(lbl_op, "op_signos")
         self.entry_sigs = tk.Text(fila_sigs, font=FUENTE_LABEL,
                                    bg=COLORES["entrada"], fg=COLORES["texto"],
                                    insertbackground=COLORES["acento4"],
                                    relief="flat", width=30, height=4)
         self.entry_sigs.insert("1.0", "/p/\n/b/\n/t/")
         self.entry_sigs.pack(side="left", padx=8, pady=6)
+        agregar_tooltip(self.entry_sigs, "op_signos")
         fila_sigs.pack(fill="x", pady=4)
 
         btn_row = tk.Frame(self, bg=COLORES["bg"])
         btn_row.grid(row=2, column=0, sticky="nw", padx=24, pady=(0,8))
         boton(btn_row, "  Aplicar D̂  ", self._aplicar,
               COLORES["acento4"]).pack(side="left", padx=(0,8))
-        boton(btn_row, "  Análisis de negatividad  ", self._negatividad,
-              COLORES["borde"]).pack(side="left", padx=(0,8))
-        boton(btn_row, "  Similitud diferencial  ", self._similitud,
-              COLORES["borde"]).pack(side="left")
+        btn_neg = boton(btn_row, "  Análisis de negatividad  ", self._negatividad,
+              COLORES["borde"])
+        btn_neg.pack(side="left", padx=(0,8))
+        agregar_tooltip(btn_neg, "op_negatividad")
+        btn_sim = boton(btn_row, "  Similitud diferencial  ", self._similitud,
+              COLORES["borde"])
+        btn_sim.pack(side="left")
+        agregar_tooltip(btn_sim, "op_similitud")
 
         sal = seccion(self, "RESULTADO", COLORES["acento4"])
         sal.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0,8))
