@@ -317,7 +317,7 @@ saussure-quantum-fusion/
 
 ## 📄 Licencia
 
-MIT © [Tu Nombre] — Ver archivo [LICENSE](LICENSE)
+MIT © Marcos Martínez — Ver archivo [LICENSE](LICENSE)
 
 ---
 
@@ -340,7 +340,7 @@ Si usas este trabajo en investigación académica:
 
 - **Issues**: Bugs y sugerencias específicas
 - **Discussions**: Conversaciones conceptuales y preguntas
-- **Email**: tu@email.com
+- **Email**: doomhammer793@gmail.com
 
 ---
 
