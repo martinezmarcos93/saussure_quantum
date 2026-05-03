@@ -515,6 +515,8 @@ class PanelPoeta(tk.Frame):
         btn_row.grid(row=3, column=0, sticky="nw", padx=24, pady=(4,8))
         boton(btn_row, "  Generar poema  ", self._generar,
               COLORES["acento"]).pack(side="left", padx=(0,8))
+        boton(btn_row, "  Exportar .txt  ", self._exportar,
+              COLORES["acento2"]).pack(side="left", padx=(0,8))
         boton(btn_row, "  Restaurar diccionario  ", self._restaurar_dic,
               COLORES["borde"]).pack(side="left", padx=(0,8))
         boton(btn_row, "  Limpiar  ", self._limpiar,
@@ -552,6 +554,58 @@ class PanelPoeta(tk.Frame):
             amps = [1.0] * len(palabras)
             dic[cat] = SignoCuanto(palabras, amps)
         return dic
+
+    def _exportar(self):
+        """Guardar el poema actual en un archivo .txt con metadatos."""
+        contenido = self.salida.get("1.0", "end").strip()
+        if not contenido:
+            escribir_salida(self.salida, "⚠  No hay poema para exportar. Generá uno primero.\n")
+            return
+
+        from tkinter import filedialog
+        from datetime import datetime
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        nombre_default = f"poema_cuantico_{timestamp}.txt"
+
+        ruta = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Archivo de texto", "*.txt"), ("Todos los archivos", "*.*")],
+            initialfile=nombre_default,
+            title="Guardar poema"
+        )
+        if not ruta:
+            return  # Usuario canceló
+
+        modo     = self.var_modo.get()
+        versos   = int(self.var_versos.get())
+        temp     = self.var_temp.get() / 10.0
+        palabras = self.m_palabras.get()
+        entropia = self.m_entropia.get()
+
+        encabezado = (
+            f"╔══════════════════════════════════════════╗\n"
+            f"║      POEMA CUÁNTICO — Saussure×Quantum   ║\n"
+            f"╚══════════════════════════════════════════╝\n"
+            f"\n"
+            f"Generado:        {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n"
+            f"Versos:          {versos}\n"
+            f"Modo:            {modo}\n"
+            f"Temperatura ℏ:  {temp:.1f}\n"
+            f"Palabras:        {palabras}\n"
+            f"Entropía media: {entropia}\n"
+            f"\n{'─'*44}\n\n"
+        )
+
+        with open(ruta, "w", encoding="utf-8") as f:
+            f.write(encabezado + contenido + "\n")
+
+        # Confirmación en la zona de salida
+        escribir_salida(
+            self.salida,
+            contenido + f"\n\n✅  Poema exportado a:\n   {ruta}",
+            limpiar=True
+        )
 
     def _restaurar_dic(self):
         """Restaurar el diccionario a los valores por defecto."""
@@ -682,6 +736,8 @@ class PanelSimulador(tk.Frame):
         boton(btn_row, "  Analizar estado  ", self._analizar,
               COLORES["acento2"]).pack(side="left", padx=(0,8))
         boton(btn_row, "  Demostrar principio  ", self._demostrar,
+              COLORES["borde"]).pack(side="left", padx=(0,8))
+        boton(btn_row, "  Comparar 4 estados  ", self._comparar,
               COLORES["borde"]).pack(side="left")
 
         sal = seccion(self, "ANÁLISIS DE INCERTIDUMBRE", COLORES["acento2"])
@@ -769,6 +825,62 @@ class PanelSimulador(tk.Frame):
         lineas.append(f"Cota mínima ℏ/2 = {cota:.4f}")
         lineas.append("Cuando ΔS ↓  →  ΔP ↑  y viceversa.")
         escribir_salida(self.salida, "\n".join(lineas))
+
+    def _comparar(self):
+        """Tabla comparativa de los 4 tipos de estado en la dimensión actual."""
+        if not PAQUETE_OK:
+            return
+        dim = int(self.var_dim.get())
+        pos = int(min(self.var_pos.get(), dim - 1))
+        lang = Langue(dim)
+        principio = PrincipioIncertidumbreSaussure(lang)
+        cota = HBAR_SEMIOTICO / 2
+
+        tipos = [
+            ("Sintagmático puro",    principio.estado_sintagmatico_puro(pos)),
+            ("Paradigmático puro",   principio.estado_paradigmatico_puro(pos)),
+            ("Mínima incertidumbre", principio.obs.estado_minima_incertidumbre()),
+            ("Superposición uniforme", lang.superposicion([1] * dim)),
+        ]
+
+        sep  = "─" * 62
+        col  = f"{'TIPO DE ESTADO':<24} {'ΔS':>8} {'ΔP':>8} {'ΔS·ΔP':>10} {'Factor':>7}"
+        lineas = [
+            "╔══════════════════════════════════════════════════════════╗",
+            f"║  COMPARACIÓN DE ESTADOS  —  dim={dim:<3}  pos/modo={pos:<3}        ║",
+            "╚══════════════════════════════════════════════════════════╝\n",
+            col,
+            sep,
+        ]
+
+        for nombre, estado in tipos:
+            a = principio.analizar_estado(estado)
+            dS   = a["delta_sintagma"]
+            dP   = a["delta_paradigma"]
+            prod = a["producto_incertidumbre"]
+            factor = a["factor_sobre_cota"]
+            ok = "✓" if a["satisface_principio"] else "✗"
+            # Limitar valores infinitos para display
+            dS_s   = f"{dS:.4f}"   if np.isfinite(dS)   else "  ∞"
+            dP_s   = f"{dP:.4f}"   if np.isfinite(dP)   else "  ∞"
+            prod_s = f"{prod:.4f}" if np.isfinite(prod)  else "    ∞"
+            fac_s  = f"{factor:.2f}x" if np.isfinite(factor) else "   ∞x"
+            lineas.append(f"{ok} {nombre:<23} {dS_s:>8} {dP_s:>8} {prod_s:>10} {fac_s:>7}")
+
+        lineas += [
+            sep,
+            f"  Cota mínima ℏ/2 = {cota:.4f}",
+            f"  ✓ = satisface el principio   ✗ = viola el principio\n",
+            "  Observá cómo ΔS y ΔP se compensan entre tipos de estado:",
+            "  cuando uno baja, el otro sube para mantener ΔS·ΔP ≥ ℏ/2.",
+        ]
+        escribir_salida(self.salida, "\n".join(lineas))
+        # Actualizar métricas con el tipo seleccionado actualmente
+        estado_actual, _ = self._get_estado()
+        a = principio.analizar_estado(estado_actual)
+        self.m_ds.set(f"{a['delta_sintagma']:.3f}"   if np.isfinite(a['delta_sintagma'])   else "∞")
+        self.m_dp.set(f"{a['delta_paradigma']:.3f}"  if np.isfinite(a['delta_paradigma'])  else "∞")
+        self.m_prod.set(f"{a['producto_incertidumbre']:.3f}" if np.isfinite(a['producto_incertidumbre']) else "∞")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
