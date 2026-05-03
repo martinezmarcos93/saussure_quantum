@@ -112,6 +112,7 @@ class AppSaussureQuantum(tk.Tk):
         self.paneles["simulador"]    = PanelSimulador(self.main)
         self.paneles["incertidumbre"]= PanelIncertidumbre(self.main)
         self.paneles["diferencia"]   = PanelDiferencia(self.main)
+        self.paneles["teoria"]       = PanelTeoria(self.main)
 
         for p in self.paneles.values():
             p.grid(row=0, column=0, sticky="nsew")
@@ -137,6 +138,7 @@ class AppSaussureQuantum(tk.Tk):
             ("simulador",     "◉  Simulador",         COLORES["acento2"]),
             ("incertidumbre", "△  Incertidumbre",     COLORES["acento3"]),
             ("diferencia",    "⊗  Op. Diferencia",    COLORES["acento4"]),
+            ("teoria",        "❖  Teoría",            COLORES["texto"]),
         ]
         for key, label, color in items:
             btn = tk.Label(
@@ -1145,8 +1147,10 @@ class PanelDiferencia(tk.Frame):
         agregar_tooltip(btn_neg, "op_negatividad")
         btn_sim = boton(btn_row, "  Similitud diferencial  ", self._similitud,
               COLORES["borde"])
-        btn_sim.pack(side="left")
+        btn_sim.pack(side="left", padx=(0,8))
         agregar_tooltip(btn_sim, "op_similitud")
+        boton(btn_row, "  Ver matriz D̂  ", self._ver_matriz,
+              COLORES["borde"]).pack(side="left")
 
         sal = seccion(self, "RESULTADO", COLORES["acento4"])
         sal.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0,8))
@@ -1266,10 +1270,233 @@ class PanelDiferencia(tk.Frame):
         lineas.append("0.0 = ortogonales, sin relación")
         escribir_salida(self.salida, "\n".join(lineas))
 
+    def _ver_matriz(self):
+        """Mostrar la matriz completa del operador D̂ para el sistema actual."""
+        if not PAQUETE_OK:
+            return
+        try:
+            sigs, estados = self._get_signos()
+        except Exception as e:
+            escribir_salida(self.salida, f"Error: {e}\n")
+            return
+
+        lang = Langue(len(sigs), terminos=sigs)
+        op   = OperadorDiferencia(lang)
+        D    = op.matriz()
+        d    = len(sigs)
+
+        # Encabezado
+        lineas = [
+            "MATRIZ DEL OPERADOR D̂\n",
+            f"D = d·I - J   (d={d}, I=identidad, J=matriz de unos)\n",
+            f"{'─'*42}\n",
+        ]
+
+        # Fila de encabezado de columnas
+        col_w = 8
+        header = " " * 14 + "".join(f"{s[:6]:>{col_w}}" for s in sigs)
+        lineas.append(header)
+        lineas.append("  " + "─" * (12 + col_w * d))
+
+        # Filas de la matriz
+        for i, sig_fila in enumerate(sigs):
+            fila = f"  {sig_fila[:12]:<12}│"
+            for j in range(d):
+                val = D[i, j].real
+                fila += f"{val:>{col_w}.1f}"
+            lineas.append(fila)
+
+        # Propiedades
+        autovalores = sorted(set(np.linalg.eigvals(D).real.round(4)))
+        traza = np.trace(D).real
+        lineas += [
+            f"\n{'─'*42}",
+            f"Traza:        {traza:.1f}",
+            f"Autovalores:  {[round(v,2) for v in autovalores]}",
+            f"\nInterpretación:",
+            f"  Diagonal = {d-1:.0f}  (cada signo se opone a {d-1} otros)",
+            f"  Fuera de diagonal = -1  (fuerza de oposición entre pares)",
+        ]
+
+        escribir_salida(self.salida, "\n".join(lineas))
+        self.m_dim.set(str(d))
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  ENTRY POINT
+#  PANEL 5 — TEORÍA
 # ═══════════════════════════════════════════════════════════════════════════════
+
+TEORIA_CONTENIDO = {
+    "¿Qué es esto?": """\
+Saussure–Quantum Fusion es una implementación computacional
+de la fusión entre la semiótica estructural de Ferdinand de
+Saussure (1857–1913) y la mecánica cuántica (Bohr, Heisenberg).
+
+TESIS CENTRAL:
+  "La realidad no es una sustancia, sino un efecto de segundo
+   orden que emerge de la diferencia observada."
+
+El mundo no está hecho de objetos con propiedades intrínsecas,
+sino de relaciones de oposición que colapsan en el acto de
+ser observadas o enunciadas.
+
+Ambos sistemas — el lingüístico y el cuántico — comparten
+una estructura matemática profundamente isomórfica.""",
+
+    "Saussure": """\
+Ferdinand de Saussure (1857–1913) propuso que el lenguaje
+es un sistema de diferencias puras, sin términos positivos.
+
+CONCEPTOS CLAVE:
+
+Signo lingüístico:
+  Unidad de dos caras: significante (imagen acústica)
+  y significado (concepto). Su valor es puramente
+  relacional — no existe por sí mismo.
+
+Langue vs Parole:
+  Langue = el sistema (potencial, social, virtual)
+  Parole = el acto de habla (actual, individual, real)
+
+Ejes paradigmático y sintagmático:
+  Paradigma: relaciones de sustitución (¿qué puede
+             reemplazar a esta palabra?)
+  Sintagma:  relaciones de posición (¿dónde está
+             en la cadena hablada?)
+
+Principio de negatividad:
+  "En la lengua solo hay diferencias sin términos
+   positivos." — Saussure, Cours de Linguistique, 1916""",
+
+    "Mecánica cuántica": """\
+La mecánica cuántica describe la física a escala subatómica.
+Sus principios más relevantes para esta fusión son:
+
+Estado cuántico (|ψ⟩):
+  Un sistema existe en superposición de todos sus estados
+  posibles hasta ser medido. La medición colapsa la
+  superposición a un resultado concreto.
+
+Principio de incertidumbre (Heisenberg):
+  ΔS · ΔP ≥ ℏ/2
+  No se pueden conocer simultáneamente posición y momento
+  con precisión arbitraria. Cuanto más precisa es una
+  medición, más incierta se vuelve la complementaria.
+
+Colapso por observación:
+  "No hay fenómeno cuántico sin observación." — Bohr
+  El observador es constitutivo de la realidad medida.
+
+Amplitudes de probabilidad:
+  Los estados se describen con números complejos αᵢ ∈ ℂ.
+  La probabilidad de medir el estado i es |αᵢ|².""",
+
+    "La fusión": """\
+TABLA DE ANALOGÍAS:
+
+  Saussure              Cuántico           Implementación
+  ─────────────────────────────────────────────────────
+  Signo lingüístico  ↔  Estado cuántico   SignoCuanto
+  Langue             ↔  Espacio Hilbert   Langue
+  Parole             ↔  Colapso/medición  colapso_parole()
+  Negatividad (D̂)    ↔  Amplitud prob.   operador_diferencia()
+  Eje sintagmático   ↔  Posición (Ŝ)     ObservablesSaussureanos.S
+  Eje paradigmático  ↔  Momento (P̂)     ObservablesSaussureanos.P
+  Indeterminación    ↔  Incertidumbre    incertidumbre_s_h()
+
+FORMALISMO MATEMÁTICO:
+
+  |signo⟩ = Σᵢ αᵢ |sᵢ⟩        (superposición)
+  D̂ = d·I - J                  (operador diferencia)
+  ΔS · ΔP ≥ ℏ_semiótico / 2   (principio incertidumbre)
+
+NOTA MATEMÁTICA:
+  La relación [Ŝ, P̂] = iℏI es imposible en dim. finita
+  (Tr([S,P])=0 pero Tr(iℏI)=iℏd≠0). El operador P usa
+  condiciones periódicas que minimizan el error de borde.""",
+
+    "Herramientas": """\
+◈ POETA CUÁNTICO
+  Genera versos usando colapsos probabilísticos.
+  Cada palabra comienza en superposición y colapsa
+  al ser "dicha". La temperatura ℏ controla el caos.
+  Podés personalizar el diccionario por categoría.
+
+◉ SIMULADOR DE INCERTIDUMBRE
+  Demuestra que ΔS·ΔP ≥ ℏ/2 para distintos tipos
+  de estado. Compará los 4 tipos en una sola tabla
+  y observá cómo ΔS y ΔP se compensan mutuamente.
+
+△ PRINCIPIO DE INCERTIDUMBRE
+  Analizá tu propio conjunto de signos. Ingresá los
+  significantes y sus amplitudes, o cargá uno de los
+  7 ejemplos predefinidos. La paradoja del observador
+  muestra cómo medir un eje perturba el otro.
+
+⊗ OPERADOR DIFERENCIA
+  Ingresá un sistema de signos y aplicá D̂ para ver
+  cómo cada signo se disuelve en pura diferencia.
+  Visualizá la matriz completa, la negatividad de
+  cada signo y la similitud diferencial entre pares.""",
+}
+
+
+class PanelTeoria(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, bg=COLORES["bg"])
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(1, weight=1)
+        self._build()
+
+    def _build(self):
+        cab = tk.Frame(self, bg=COLORES["bg"])
+        cab.grid(row=0, column=0, sticky="ew", padx=24, pady=(24,0))
+        label_titulo(cab, "❖  Teoría y conceptos", COLORES["texto"]).pack(anchor="w")
+        label_sec(cab, "Fundamentos de la fusión Saussure–Cuántica").pack(
+            anchor="w", pady=(2,12))
+
+        # Navegación por subtemas
+        nav = tk.Frame(cab, bg=COLORES["bg"])
+        nav.pack(fill="x")
+        self.var_tema = tk.StringVar(value=list(TEORIA_CONTENIDO.keys())[0])
+        self.nav_btns = {}
+        for tema in TEORIA_CONTENIDO:
+            btn = tk.Label(
+                nav, text=tema, font=FUENTE_SMALL,
+                bg=COLORES["panel"], fg=COLORES["texto_sec"],
+                padx=10, pady=6, cursor="hand2",
+                relief="flat",
+                highlightbackground=COLORES["borde"],
+                highlightthickness=1
+            )
+            btn.pack(side="left", padx=(0,4))
+            btn.bind("<Button-1>", lambda e, t=tema: self._mostrar_tema(t))
+            btn.bind("<Enter>",    lambda e, b=btn: b.configure(fg=COLORES["texto"]))
+            btn.bind("<Leave>",    lambda e, b=btn, t=tema: self._hover_leave_btn(b, t))
+            self.nav_btns[tema] = btn
+
+        # Zona de contenido
+        sal = seccion(self, "CONTENIDO", COLORES["texto"])
+        sal.grid(row=1, column=0, sticky="nsew", padx=24, pady=12)
+        self.salida = area_salida(sal, height=20)
+        self.salida.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Mostrar primer tema
+        self._mostrar_tema(list(TEORIA_CONTENIDO.keys())[0])
+
+    def _mostrar_tema(self, tema):
+        self.var_tema.set(tema)
+        # Actualizar estilos de botones
+        for t, btn in self.nav_btns.items():
+            if t == tema:
+                btn.configure(bg=COLORES["acento"], fg=COLORES["bg"])
+            else:
+                btn.configure(bg=COLORES["panel"], fg=COLORES["texto_sec"])
+        escribir_salida(self.salida, TEORIA_CONTENIDO[tema])
+
+    def _hover_leave_btn(self, btn, tema):
+        if tema != self.var_tema.get():
+            btn.configure(fg=COLORES["texto_sec"])
 
 if __name__ == "__main__":
     app = AppSaussureQuantum()
