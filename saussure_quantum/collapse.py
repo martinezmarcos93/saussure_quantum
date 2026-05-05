@@ -224,7 +224,7 @@ class MedidorParole:
         
         total = sum(self.estadisticas.values())
         probs = [c/total for c in self.estadisticas.values()]
-        return -np.sum(p * np.log(p) for p in probs if p > 0)
+        return -np.sum([p * np.log(p) for p in probs if p > 0])
 
 
 def medicion_debil(

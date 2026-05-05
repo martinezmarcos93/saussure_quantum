@@ -50,18 +50,18 @@ class TestSignoCuanto:
     def test_collapse(self):
         """Test colapso del estado"""
         s = SignoCuanto(["A", "B"], [1, 0])  # 100% A
-        resultado = s.colapsar()  # Sin índice forzado
-        assert resultado == "A"
-        assert s.amplitudes[0] == 1.0
-        assert s.amplitudes[1] == 0.0
-    
+        sig, estado_colapsado = s.colapsar()
+        assert sig == "A"
+        assert estado_colapsado.amplitudes[0] == 1.0
+        assert estado_colapsado.amplitudes[1] == 0.0
+
     def test_collapse_forced(self):
         """Test colapso con índice forzado"""
         s = SignoCuanto(["uno", "dos"], [0.5, 0.5])
-        resultado = s.colapsar(idx=1)
-        assert resultado == "dos"
-        assert s.amplitudes[0] == 0.0
-        assert s.amplitudes[1] == 1.0
+        sig, estado_colapsado = s.colapsar(idx=1)
+        assert sig == "dos"
+        assert estado_colapsado.amplitudes[0] == 0.0
+        assert estado_colapsado.amplitudes[1] == 1.0
     
     def test_density_matrix(self):
         """Test matriz densidad"""
